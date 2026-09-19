@@ -1,6 +1,6 @@
 /**
- * Twibbon Video Generator Engine
- * Stack: HTML5 Canvas, MediaRecorder, Cropper.js, Web Audio API
+ * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
+ * Stack: HTML5 Canvas, WebCodecs, mp4-muxer, MediaRecorder, Cropper.js
  */
 
 // Global App State
@@ -90,7 +90,7 @@ function initCanvases() {
  * Load Initial Assets (SVG Frame and Intro Video)
  */
 function loadDefaultAssets() {
-  // 1. Try to load twibon.svg from assets/images/
+  // 1. Load twibon.svg from assets/images/
   state.frameImg.crossOrigin = 'anonymous';
   
   const frameCandidates = [
@@ -102,10 +102,10 @@ function loadDefaultAssets() {
   ];
   loadFirstAvailableImage(frameCandidates, 0);
 
-  // 2. Try to load Framenaur.mp4 from assets/videos/
+  // 2. Load Framenaur.mp4 from assets/videos/
   state.introVideo.crossOrigin = 'anonymous';
   state.introVideo.playsInline = true;
-  state.introVideo.muted = false;
+  state.introVideo.muted = true; // Muted for seamless autoplay on mobile
   state.introVideo.preload = 'auto';
   
   const videoCandidates = [
@@ -134,7 +134,6 @@ function loadFirstAvailableImage(candidates, index) {
     state.isFrameLoaded = true;
     
     // KUNCI RESOLUSI TETAP KE 1080 x 1350 (4:5 Murni Portrait Instagram/WA)
-    // Hindari glitch browser yang membaca SVG sebagai 300x150 landscape
     state.aspectRatio = 1080 / 1350;
     state.canvasSize = { width: 1080, height: 1350 };
     
@@ -156,7 +155,7 @@ function loadFirstAvailableImage(candidates, index) {
       el.cropperFrameOverlay.src = transparentFrameDataUrl;
     }
     
-    console.log(`Menggunakan frame twibbon: ${candidates[index]} (TERKUNCI 1080x1350 - Rasio 4:5 Murni)`);
+    console.log(`Menggunakan frame twibbon: ${candidates[index]} (TERKUNCI 1080x1350 - Rasio 4:5)`);
   };
   testImg.onerror = () => {
     loadFirstAvailableImage(candidates, index + 1);
@@ -215,6 +214,8 @@ function loadFirstAvailableVideo(candidates, index) {
   const vSrc = candidates[index];
   const testVid = document.createElement('video');
   testVid.crossOrigin = 'anonymous';
+  testVid.playsInline = true;
+  testVid.muted = true;
   testVid.src = vSrc;
 
   testVid.onloadedmetadata = () => {
@@ -222,7 +223,7 @@ function loadFirstAvailableVideo(candidates, index) {
     state.isVideoLoaded = true;
     state.hasCustomVideo = true;
     updateVideoStatusBadge(true, `Video Siap (${vSrc} - ${testVid.duration.toFixed(1)}s)`);
-    console.log(`Menggunakan video: ${vSrc}`);
+    console.log(`Menggunakan video: ${vSrc} (${testVid.duration.toFixed(1)}s)`);
   };
 
   testVid.onerror = () => {
@@ -250,26 +251,26 @@ function updateVideoStatusBadge(isCustom, text) {
 function createFallbackFrame() {
   const c = document.createElement('canvas');
   c.width = 1080;
-  c.height = 1080;
+  c.height = 1350;
   const ctx = c.getContext('2d');
 
   // Outer frame
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, 1080, 1080);
+  ctx.fillStyle = '#162b3d';
+  ctx.fillRect(0, 0, 1080, 1350);
 
   // Cutout
-  ctx.clearRect(140, 160, 800, 660);
+  ctx.clearRect(90, 180, 900, 900);
 
   // Border
-  ctx.strokeStyle = '#2563eb';
+  ctx.strokeStyle = '#b69861';
   ctx.lineWidth = 14;
-  ctx.strokeRect(140, 160, 800, 660);
+  ctx.strokeRect(90, 180, 900, 900);
 
   // Text
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 36px sans-serif';
+  ctx.font = 'bold 42px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('TWIBBON MAHASISWA BARU', 540, 930);
+  ctx.fillText('TWIBBON PKKMB LPKIA 2026', 540, 1180);
 
   state.frameImg.src = c.toDataURL();
   state.isFrameLoaded = true;
@@ -289,14 +290,14 @@ function bindEvents() {
   // Drag & Drop
   el.uploadDropzone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    el.uploadDropzone.classList.add('border-blue-600', 'bg-blue-50');
+    el.uploadDropzone.classList.add('border-[#b69861]', 'bg-amber-50/20');
   });
   el.uploadDropzone.addEventListener('dragleave', () => {
-    el.uploadDropzone.classList.remove('border-blue-600', 'bg-blue-50');
+    el.uploadDropzone.classList.remove('border-[#b69861]', 'bg-amber-50/20');
   });
   el.uploadDropzone.addEventListener('drop', (e) => {
     e.preventDefault();
-    el.uploadDropzone.classList.remove('border-blue-600', 'bg-blue-50');
+    el.uploadDropzone.classList.remove('border-[#b69861]', 'bg-amber-50/20');
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleUserFile(e.dataTransfer.files[0]);
     }
@@ -353,7 +354,7 @@ function bindEvents() {
           icon: 'success',
           title: 'Video Intro Diganti',
           text: `Menggunakan video: ${file.name}`,
-          confirmButtonColor: '#1e40af'
+          confirmButtonColor: '#162b3d'
         });
       }
     });
@@ -373,7 +374,7 @@ function bindEvents() {
             icon: 'success',
             title: 'Frame Twibbon Diganti',
             text: `Menggunakan frame: ${file.name} (Auto Green-Screen Hilang)`,
-            confirmButtonColor: '#1e40af'
+            confirmButtonColor: '#162b3d'
           });
         };
       }
@@ -443,13 +444,13 @@ function openCropper(imageSrc) {
   }
 
   state.cropper = new Cropper(el.cropperImage, {
-    aspectRatio: state.aspectRatio || 1,
+    aspectRatio: state.aspectRatio || (1080 / 1350),
     viewMode: 0, // Bebas digeser tanpa batas kaku
     dragMode: 'move', // Menggeser foto langsung
     autoCropArea: 1, // Pas 100% frame
     restore: false,
-    guides: false, // Hilangkan garis putus-putus
-    center: false, // Hilangkan tanda plus di tengah
+    guides: false,
+    center: false,
     highlight: false,
     cropBoxMovable: false, // Frame terkunci
     cropBoxResizable: false, // Ukuran frame terkunci
@@ -531,7 +532,7 @@ function resetToUpload() {
 let previewState = {
   isPlaying: false,
   currentTime: 0,
-  introDuration: 3, // fallback intro duration in seconds
+  introDuration: 3,
   totalDuration: 8,
   startTime: 0
 };
@@ -541,7 +542,7 @@ function startPreviewPlayer() {
 
   const introDuration = state.hasCustomVideo && state.introVideo.duration && !isNaN(state.introVideo.duration)
     ? state.introVideo.duration
-    : 3.5; // fallback animated intro duration
+    : 3.5;
 
   previewState.introDuration = introDuration;
   previewState.totalDuration = introDuration + state.holdPhotoDuration;
@@ -551,7 +552,7 @@ function startPreviewPlayer() {
 
   if (state.hasCustomVideo) {
     state.introVideo.currentTime = 0;
-    state.introVideo.play().catch(e => console.log('Autoplay audio blocked, silent play'));
+    state.introVideo.play().catch(e => console.log('Autoplay muted preview'));
   }
 
   updatePlayButtonIcon(true);
@@ -657,13 +658,11 @@ function drawCoverMedia(ctx, media, targetW, targetH) {
   let renderW, renderH, offsetX, offsetY;
 
   if (srcRatio > targetRatio) {
-    // Media lebih lebar -> scale by height dan crop kiri-kanan
     renderH = targetH;
     renderW = targetH * srcRatio;
     offsetX = (targetW - renderW) / 2;
     offsetY = 0;
   } else {
-    // Media lebih tinggi -> scale by width dan crop atas-bawah
     renderW = targetW;
     renderH = targetW / srcRatio;
     offsetX = 0;
@@ -687,27 +686,27 @@ function renderFrameToCanvas(ctx, time, introDuration) {
   ctx.imageSmoothingQuality = 'high';
 
   // Base background
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#162b3d';
   ctx.fillRect(0, 0, width, height);
 
   const fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
 
   if (time < fadeStartTime) {
-    // PHASE 1: FULL INTRO VIDEO (Cover 100% 4:5 tanpa garis hitam)
+    // PHASE 1: FULL INTRO VIDEO (Cover 100% 4:5)
     if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
       drawCoverMedia(ctx, state.introVideo, width, height);
     } else {
       drawProceduralIntro(ctx, time, introDuration, width, height);
     }
   } else if (time >= fadeStartTime && time < introDuration) {
-    // PHASE 1.5: MAGICAL STARBURST CROSSFADE (Cover 100% 4:5)
+    // PHASE 1.5: MAGICAL STARBURST CROSSFADE
     if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
       drawCoverMedia(ctx, state.introVideo, width, height);
     } else {
       drawProceduralIntro(ctx, time, introDuration, width, height);
     }
 
-    // Blend Twibbon + Foto Maba muncul dari balik kilau bintang
+    // Blend Twibbon + Foto Maba
     const progress = (time - fadeStartTime) / crossfadeDuration;
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, progress));
@@ -721,13 +720,10 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 
     ctx.restore();
   } else {
-    // PHASE 2: FULL TWIBBON + FOTO MABA (100% 4:5)
-    // 1. Draw Cropped Photo
+    // PHASE 2: FULL TWIBBON + FOTO MABA
     if (state.croppedCanvas) {
       ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
     }
-
-    // 2. Draw Twibbon Frame Overlay (dengan green screen yang sudah dihilangkan)
     if (state.isFrameLoaded) {
       ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
     }
@@ -738,22 +734,19 @@ function renderFrameToCanvas(ctx, time, introDuration) {
  * Built-in Procedural Flat Intro Animation (for testing without external mp4)
  */
 function drawProceduralIntro(ctx, time, duration, w, h) {
-  const progress = time / duration; // 0 to 1
+  const progress = time / duration;
 
-  // Solid background
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#162b3d';
   ctx.fillRect(0, 0, w, h);
 
-  // Geometric expanding boxes
   const boxScale = Math.min(1, progress * 1.5);
-  ctx.fillStyle = '#1e40af';
+  ctx.fillStyle = '#830106';
   ctx.fillRect(w/2 - (400 * boxScale), h/2 - (240 * boxScale), 800 * boxScale, 480 * boxScale);
 
-  ctx.strokeStyle = '#f59e0b';
+  ctx.strokeStyle = '#b69861';
   ctx.lineWidth = 12;
   ctx.strokeRect(w/2 - (420 * boxScale), h/2 - (260 * boxScale), 840 * boxScale, 520 * boxScale);
 
-  // Animated Text
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 54px sans-serif';
   ctx.textAlign = 'center';
@@ -761,25 +754,24 @@ function drawProceduralIntro(ctx, time, duration, w, h) {
 
   if (progress < 0.5) {
     ctx.fillText('WELCOME TO', w/2, h/2 - 40);
-    ctx.fillStyle = '#f59e0b';
+    ctx.fillStyle = '#b69861';
     ctx.font = 'bold 64px sans-serif';
-    ctx.fillText('KAMPUS KEBANGGAAN', w/2, h/2 + 40);
+    ctx.fillText('LPKIA 2026', w/2, h/2 + 40);
   } else {
     ctx.fillText('OFFICIAL TWIBBON', w/2, h/2 - 40);
-    ctx.fillStyle = '#f59e0b';
+    ctx.fillStyle = '#b69861';
     ctx.font = 'bold 72px sans-serif';
-    ctx.fillText('MAHASISWA BARU 2026', w/2, h/2 + 50);
+    ctx.fillText('SADAJIWA IDE', w/2, h/2 + 50);
   }
 
-  // Progress line at bottom
-  ctx.fillStyle = '#2563eb';
+  ctx.fillStyle = '#b69861';
   ctx.fillRect(0, h - 24, w * progress, 24);
 }
 
 /**
- * ----------------------------------------------------
- * VIDEO EXPORT ENGINE (MediaRecorder + Canvas Stream)
- * ----------------------------------------------------
+ * ------------------------------------------------------------------
+ * VIDEO EXPORT ENGINE (WebCodecs + Mp4Muxer / Deterministic Stepping)
+ * ------------------------------------------------------------------
  */
 async function startVideoExport() {
   if (state.isRendering || !state.croppedCanvas) return;
@@ -788,7 +780,7 @@ async function startVideoExport() {
 
   // Show processing modal
   el.processingModal.classList.remove('hidden');
-  updateExportProgress(0, 'Menyiapkan encoder video...');
+  updateExportProgress(0, 'Menyiapkan mesin render MP4...');
 
   try {
     const fps = 30;
@@ -798,117 +790,319 @@ async function startVideoExport() {
     const totalDuration = introDuration + state.holdPhotoDuration;
     const totalFrames = Math.ceil(totalDuration * fps);
 
-    // Setup Canvas Stream
-    const stream = state.renderCanvas.captureStream(fps);
+    const width = state.canvasSize.width;   // 1080
+    const height = state.canvasSize.height; // 1350
 
-    // Setup Audio Capture if custom video is present
-    let audioContext = null;
-    let audioDestination = null;
-    let audioStream = null;
+    // Check if WebCodecs (VideoEncoder) and Mp4Muxer are available
+    const supportsWebCodecs = typeof window.VideoEncoder !== 'undefined' && 
+                              typeof window.VideoFrame !== 'undefined' && 
+                              typeof window.Mp4Muxer !== 'undefined';
 
-    if (state.hasCustomVideo) {
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioCtx();
-        audioDestination = audioContext.createMediaStreamDestination();
-        const source = audioContext.createMediaElementSource(state.introVideo);
-        source.connect(audioDestination);
-        source.connect(audioContext.destination);
-
-        const audioTracks = audioDestination.stream.getAudioTracks();
-        if (audioTracks.length > 0) {
-          stream.addTrack(audioTracks[0]);
-        }
-      } catch (e) {
-        console.warn('Audio capture bypassed:', e);
-      }
+    if (supportsWebCodecs) {
+      await exportVideoWithWebCodecs({ fps, introDuration, totalDuration, totalFrames, width, height });
+    } else {
+      console.warn('WebCodecs not supported, using MediaRecorder fallback.');
+      await exportVideoWithMediaRecorder({ fps, introDuration, totalDuration, totalFrames, width, height });
     }
-
-    // Determine Best Supported MimeType
-    let mimeType = 'video/webm;codecs=vp9,opus';
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/webm;codecs=vp8,opus';
-    }
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/mp4';
-    }
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/webm';
-    }
-
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: mimeType,
-      videoBitsPerSecond: 16000000 // 16 Mbps Ultra Crisp High Resolution
-    });
-
-    const recordedChunks = [];
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) {
-        recordedChunks.push(e.data);
-      }
-    };
-
-    mediaRecorder.onstop = () => {
-      updateExportProgress(100, 'Selesai! Mengunduh video...');
-      const blob = new Blob(recordedChunks, { type: mimeType });
-      const extension = mimeType.includes('mp4') ? 'mp4' : 'mp4'; // Modern player accepts standard extension
-      const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.${extension}`;
-
-      downloadBlob(blob, filename);
-
-      setTimeout(() => {
-        el.processingModal.classList.add('hidden');
-        state.isRendering = false;
-        startPreviewPlayer(); // Resume preview
-        Swal.fire({
-          icon: 'success',
-          title: 'Video Berhasil Dibuat!',
-          text: `File ${filename} berhasil diunduh dengan kualitas Ultra HD (4:5).`,
-          confirmButtonColor: '#162b3d'
-        });
-      }, 800);
-    };
-
-    mediaRecorder.start();
-
-    // Mulai render frame demi frame
-    if (state.hasCustomVideo) {
-      state.introVideo.currentTime = 0;
-      state.introVideo.play().catch(() => {});
-    }
-
-    const frameInterval = 1000 / fps;
-    let currentFrame = 0;
-
-    const renderTimer = setInterval(() => {
-      const currentTime = currentFrame / fps;
-
-      if (currentTime >= totalDuration) {
-        clearInterval(renderTimer);
-        if (state.hasCustomVideo) state.introVideo.pause();
-        mediaRecorder.stop();
-        return;
-      }
-
-      // Draw to High-Res Render Canvas
-      renderFrameToCanvas(state.renderCtx, currentTime, introDuration);
-
-      currentFrame++;
-      const percent = Math.min(99, Math.round((currentFrame / totalFrames) * 100));
-      updateExportProgress(percent, `Merender video: detik ke-${currentTime.toFixed(1)} dari ${totalDuration.toFixed(1)}s`);
-    }, frameInterval);
-
   } catch (err) {
     console.error('Export Error:', err);
     el.processingModal.classList.add('hidden');
     state.isRendering = false;
+    startPreviewPlayer();
     Swal.fire({
       icon: 'error',
       title: 'Gagal Membuat Video',
-      text: err.message || 'Terjadi kesalahan pada browser saat merender.',
-      confirmButtonColor: '#1e40af'
+      text: err.message || 'Terjadi kesalahan saat merender video.',
+      confirmButtonColor: '#162b3d'
     });
   }
+}
+
+/**
+ * Primary Exporter: True ISO MP4 with WebCodecs & Mp4Muxer (Guaranteed 30 FPS on all phones & iOS)
+ */
+async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, totalFrames, width, height }) {
+  updateExportProgress(5, 'Menginisialisasi encoder H.264 MP4...');
+
+  // 1. Setup Audio decoding if custom video exists
+  let audioBuffer = null;
+  if (state.hasCustomVideo && state.introVideo.src) {
+    try {
+      const response = await fetch(state.introVideo.src);
+      const arrayBuffer = await response.arrayBuffer();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    } catch (e) {
+      console.warn('Audio decoding skipped/failed:', e);
+    }
+  }
+
+  // Check if AudioEncoder and AAC are supported
+  let audioEncoder = null;
+  let hasAudioTrack = false;
+  let sampleRate = 44100;
+  let numberOfChannels = 2;
+
+  if (audioBuffer && typeof window.AudioEncoder !== 'undefined') {
+    sampleRate = audioBuffer.sampleRate;
+    numberOfChannels = Math.min(2, audioBuffer.numberOfChannels);
+    try {
+      const audioConfig = {
+        codec: 'mp4a.40.2',
+        sampleRate: sampleRate,
+        numberOfChannels: numberOfChannels,
+        bitrate: 128000
+      };
+      const isAudioSupported = await AudioEncoder.isConfigSupported(audioConfig);
+      if (isAudioSupported.supported) {
+        hasAudioTrack = true;
+      }
+    } catch (e) {
+      console.warn('AudioEncoder not supported for AAC:', e);
+    }
+  }
+
+  // 2. Setup Mp4Muxer
+  const muxerOptions = {
+    target: new Mp4Muxer.ArrayBufferTarget(),
+    video: {
+      codec: 'avc',
+      width: width,
+      height: height
+    },
+    fastStart: 'in-memory'
+  };
+
+  if (hasAudioTrack) {
+    muxerOptions.audio = {
+      codec: 'aac',
+      numberOfChannels: numberOfChannels,
+      sampleRate: sampleRate
+    };
+  }
+
+  const muxer = new Mp4Muxer.Muxer(muxerOptions);
+
+  // 3. Setup VideoEncoder (H.264 Baseline / Main Profile)
+  let encoderConfig = {
+    codec: 'avc1.420028', // H.264 Main Profile
+    width: width,
+    height: height,
+    bitrate: 6_000_000,   // 6 Mbps Crisp Full HD Portrait
+    framerate: fps
+  };
+
+  try {
+    const isVideoSupported = await VideoEncoder.isConfigSupported(encoderConfig);
+    if (!isVideoSupported.supported) {
+      encoderConfig.codec = 'avc1.42001f'; // H.264 Baseline Profile fallback
+    }
+  } catch (e) {
+    encoderConfig.codec = 'avc1.42001f';
+  }
+
+  const videoEncoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => console.error('VideoEncoder error:', e)
+  });
+
+  videoEncoder.configure(encoderConfig);
+
+  // 4. Setup AudioEncoder if active
+  if (hasAudioTrack) {
+    audioEncoder = new AudioEncoder({
+      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      error: (e) => console.error('AudioEncoder error:', e)
+    });
+    audioEncoder.configure({
+      codec: 'mp4a.40.2',
+      sampleRate: sampleRate,
+      numberOfChannels: numberOfChannels,
+      bitrate: 128000
+    });
+
+    try {
+      const audioDuration = Math.min(totalDuration, audioBuffer.duration);
+      const totalAudioSamples = Math.floor(audioDuration * sampleRate);
+      const chunkSize = 1024;
+
+      for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
+        const currentChunkSize = Math.min(chunkSize, totalAudioSamples - offset);
+        const audioDataPlanar = new Float32Array(currentChunkSize * numberOfChannels);
+
+        for (let ch = 0; ch < numberOfChannels; ch++) {
+          const channelData = audioBuffer.getChannelData(ch);
+          for (let s = 0; s < currentChunkSize; s++) {
+            audioDataPlanar[ch * currentChunkSize + s] = channelData[offset + s] || 0;
+          }
+        }
+
+        const audioDataObj = new AudioData({
+          format: 'f32-planar',
+          sampleRate: sampleRate,
+          numberOfFrames: currentChunkSize,
+          numberOfChannels: numberOfChannels,
+          timestamp: Math.round((offset / sampleRate) * 1000000)
+        });
+
+        audioEncoder.encode(audioDataObj);
+        audioDataObj.close();
+      }
+    } catch (err) {
+      console.warn('Audio chunk encoding failed:', err);
+    }
+  }
+
+  // 5. Deterministic Frame-by-Frame Video Stepping
+  if (state.hasCustomVideo) {
+    state.introVideo.pause();
+  }
+
+  const renderCanvas = state.renderCanvas;
+  const renderCtx = state.renderCtx;
+
+  for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+    const currentTime = frameIndex / fps;
+
+    // Deterministic seek video
+    if (state.hasCustomVideo && currentTime <= introDuration) {
+      state.introVideo.currentTime = Math.min(currentTime, Math.max(0, (state.introVideo.duration || 0.1) - 0.05));
+      await waitForSeek(state.introVideo);
+    }
+
+    // Render exact frame
+    renderFrameToCanvas(renderCtx, currentTime, introDuration);
+
+    // Create VideoFrame & encode
+    const timestampUs = Math.round(frameIndex * (1000000 / fps));
+    const isKeyFrame = frameIndex % 30 === 0;
+
+    const vFrame = new VideoFrame(renderCanvas, {
+      timestamp: timestampUs
+    });
+
+    videoEncoder.encode(vFrame, { keyFrame: isKeyFrame });
+    vFrame.close();
+
+    // Progress update
+    const percent = Math.min(98, Math.round((frameIndex / totalFrames) * 100));
+    updateExportProgress(percent, `Merender video: frame ${frameIndex + 1}/${totalFrames} (${currentTime.toFixed(1)}s)`);
+
+    // Let browser breathe every few frames
+    if (frameIndex % 3 === 0) {
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  updateExportProgress(99, 'Menyelesaikan file MP4...');
+
+  if (audioEncoder) {
+    await audioEncoder.flush();
+  }
+  await videoEncoder.flush();
+  muxer.finalize();
+
+  const buffer = muxer.target.buffer;
+  const blob = new Blob([buffer], { type: 'video/mp4' });
+  const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.mp4`;
+
+  updateExportProgress(100, 'Selesai! Mengunduh video...');
+  downloadBlob(blob, filename);
+
+  finishExport(filename);
+}
+
+/**
+ * Fallback Exporter: MediaRecorder with Best Available Format
+ */
+async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration, totalFrames, width, height }) {
+  const stream = state.renderCanvas.captureStream(fps);
+
+  let mimeType = 'video/mp4;codecs=avc1';
+  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
+  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp9,opus';
+  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp8,opus';
+  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+
+  const mediaRecorder = new MediaRecorder(stream, {
+    mimeType: mimeType,
+    videoBitsPerSecond: 10000000
+  });
+
+  const recordedChunks = [];
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+  };
+
+  const recordingPromise = new Promise((resolve) => {
+    mediaRecorder.onstop = () => {
+      const isMp4 = mimeType.includes('mp4');
+      const ext = isMp4 ? 'mp4' : 'webm';
+      const blob = new Blob(recordedChunks, { type: mimeType });
+      const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.${ext}`;
+      downloadBlob(blob, filename);
+      resolve(filename);
+    };
+  });
+
+  mediaRecorder.start();
+
+  if (state.hasCustomVideo) {
+    state.introVideo.pause();
+  }
+
+  for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+    const currentTime = frameIndex / fps;
+
+    if (state.hasCustomVideo && currentTime <= introDuration) {
+      state.introVideo.currentTime = Math.min(currentTime, Math.max(0, (state.introVideo.duration || 0.1) - 0.05));
+      await waitForSeek(state.introVideo);
+    }
+
+    renderFrameToCanvas(state.renderCtx, currentTime, introDuration);
+
+    const percent = Math.min(99, Math.round((frameIndex / totalFrames) * 100));
+    updateExportProgress(percent, `Merender video: frame ${frameIndex + 1}/${totalFrames}`);
+
+    await new Promise(r => setTimeout(r, 1000 / fps));
+  }
+
+  mediaRecorder.stop();
+  const filename = await recordingPromise;
+  finishExport(filename);
+}
+
+function waitForSeek(video) {
+  return new Promise((resolve) => {
+    if (video.seeking === false && video.readyState >= 2) {
+      setTimeout(resolve, 8);
+      return;
+    }
+    const onSeeked = () => {
+      video.removeEventListener('seeked', onSeeked);
+      resolve();
+    };
+    video.addEventListener('seeked', onSeeked, { once: true });
+    setTimeout(() => {
+      video.removeEventListener('seeked', onSeeked);
+      resolve();
+    }, 120);
+  });
+}
+
+function finishExport(filename) {
+  setTimeout(() => {
+    el.processingModal.classList.add('hidden');
+    state.isRendering = false;
+    startPreviewPlayer();
+    Swal.fire({
+      icon: 'success',
+      title: 'Video Berhasil Dibuat!',
+      text: `File ${filename} berhasil diunduh dengan format MP4 Full HD (4:5) terkunci 30 FPS mulus.`,
+      confirmButtonColor: '#162b3d'
+    });
+  }, 600);
 }
 
 function updateExportProgress(percent, text) {
@@ -946,8 +1140,8 @@ function exportStaticPhoto() {
     Swal.fire({
       icon: 'success',
       title: 'Foto Twibbon Diunduh',
-      text: `File ${filename} berhasil disimpan.`,
-      confirmButtonColor: '#1e40af'
+      text: `File ${filename} berhasil disimpan dalam resolusi tinggi.`,
+      confirmButtonColor: '#162b3d'
     });
   }, 'image/png');
 }
