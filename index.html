@@ -7,6 +7,11 @@
   
   <!-- Favicon Logo PKKMB -->
   <link rel="icon" type="image/png" href="Logo_PKKMB.png">
+
+  <!-- Google Font: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,6 +19,9 @@
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
           colors: {
             pkkmb: {
               blue: '#162b3d',
@@ -36,15 +44,15 @@
   <!-- Custom Flat CSS -->
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between select-none">
+<body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between select-none font-sans">
 
-  <!-- TOP APP NAVBAR (Clean & Official) -->
+  <!-- TOP APP NAVBAR (Clean, Elegant & Minimalist) -->
   <header class="bg-[#162b3d] text-white border-b-2 border-[#b69861] sticky top-0 z-30 shadow-md">
-    <div class="max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
       
       <!-- Brand & PKKMB Logo -->
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 bg-white p-1 rounded flex items-center justify-center border border-[#b69861] shrink-0">
+        <div class="w-10 h-10 bg-white p-1 rounded flex items-center justify-center border border-[#b69861] shrink-0 shadow-sm">
           <img src="Logo_PKKMB.png" alt="Logo PKKMB LPKIA" class="w-full h-full object-contain">
         </div>
         <div>
@@ -53,14 +61,6 @@
           </h1>
           <p class="text-[11px] text-[#b69861] font-bold tracking-wider uppercase">LPKIA 2026</p>
         </div>
-      </div>
-
-      <!-- Official Status Tag -->
-      <div class="flex items-center">
-        <span class="inline-flex items-center px-2.5 py-1 rounded bg-[#0f1f2d] text-[#b69861] border border-[#b69861]/40 text-[10px] sm:text-xs font-bold tracking-wider uppercase">
-          <span class="w-1.5 h-1.5 mr-1.5 bg-[#b69861] rounded-full animate-pulse"></span>
-          Official Twibbon
-        </span>
       </div>
 
     </div>
@@ -144,7 +144,7 @@
       </p>
 
       <!-- ZOOM SLIDER & TOOLBAR -->
-      <div class="max-w-[460px] mx-auto bg-slate-50 border border-slate-200 p-2.5 rounded mb-3">
+      <div class="max-w-[420px] mx-auto bg-slate-50 border border-slate-200 p-2.5 rounded mb-3">
         <!-- Zoom Slider -->
         <div class="flex items-center space-x-3 mb-2">
           <span class="text-xs font-bold text-[#162b3d] flex items-center min-w-[55px]">
@@ -180,7 +180,7 @@
       </div>
 
       <!-- ACTION BUTTONS -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200 max-w-[420px] mx-auto">
         <button id="btn-reupload" class="flat-btn flat-btn-outline w-full sm:w-auto px-4 py-2 text-xs">
           &larr; Ganti Foto
         </button>
@@ -202,13 +202,13 @@
         </button>
       </div>
 
-      <!-- CANVAS PREVIEW CONTAINER -->
+      <!-- CANVAS PREVIEW CONTAINER (4:5 Ratio) -->
       <div class="canvas-preview-container mb-2.5">
         <canvas id="preview-canvas"></canvas>
       </div>
 
       <!-- PLAYER CONTROLS & TIMELINE -->
-      <div class="max-w-[460px] mx-auto mb-4">
+      <div class="max-w-[420px] mx-auto mb-4">
         <!-- Progress Bar -->
         <div class="flat-progress-bar mb-2">
           <div id="preview-progress-bar" class="flat-progress-fill"></div>
@@ -216,7 +216,7 @@
 
         <div class="flex items-center justify-between text-xs text-slate-500 mb-2.5 font-medium">
           <span id="preview-time-display">0.0s / 0.0s</span>
-          <span class="text-[#162b3d] font-bold">1080 x 1350 (Full HD)</span>
+          <span class="text-[#162b3d] font-bold">1080 x 1350 (Full HD 4:5)</span>
         </div>
 
         <div class="flex items-center justify-center space-x-2">
@@ -236,7 +236,7 @@
       </div>
 
       <!-- DOWNLOAD BUTTONS -->
-      <div class="max-w-[460px] mx-auto space-y-2 pt-3 border-t border-slate-200">
+      <div class="max-w-[420px] mx-auto space-y-2 pt-3 border-t border-slate-200">
         <button id="btn-download-video" class="flat-btn flat-btn-primary w-full py-3 text-sm shadow-sm">
           <svg class="w-5 h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -270,14 +270,11 @@
     </div>
   </div>
 
-  <!-- FLOATING WATERMARK BADGE (Developer Attribution) -->
+  <!-- FLOATING WATERMARK CIRCULAR LOGO (Developer Attribution) -->
   <a href="https://zysrnh.my.id/" target="_blank" rel="noopener noreferrer" 
-     title="Developed by zysrnh"
-     class="wm-badge">
-    <div class="wm-logo">
-      <img src="zyrsnh.png" alt="zysrnh" class="w-full h-full object-contain">
-    </div>
-    <span>zysrnh.my.id</span>
+     title="Developed by zysrnh (zysrnh.my.id)"
+     class="wm-floating-logo">
+    <img src="zyrsnh.png" alt="zysrnh">
   </a>
 
   <!-- APP FOOTER -->
