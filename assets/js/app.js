@@ -621,7 +621,7 @@ function exportServerSideFfmpeg() {
         updateExportProgress(15, 'Mengunggah gambar ke server...');
 
         var formData = new FormData();
-        formData.append('image', blob, 'twibbon_composite.png');
+        formData.append('image', blob, 'twibbon_composite.jpg');
         formData.append('holdDuration', state.holdPhotoDuration || 5);
 
         // Progress timer simulasi saat server merender video
@@ -686,7 +686,7 @@ function exportServerSideFfmpeg() {
           console.warn('[Server Render] Koneksi server gagal: ' + netErr.message + ' -> Fallback ke client');
           return fallbackToClientRender(resolve, reject);
         }
-      }, 'image/png');
+      }, 'image/jpeg', 0.95);
 
     } catch (e) {
       fallbackToClientRender(resolve, reject);

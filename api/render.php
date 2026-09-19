@@ -94,10 +94,10 @@ if (!is_writable($tempDir)) {
 }
 
 $uniqueId = bin2hex(random_bytes(8));
-$tempPhotoPath = $tempDir . '/twib_in_' . $uniqueId . '.png';
+$tempPhotoPath = $tempDir . '/twib_in_' . $uniqueId . '.jpg';
 $tempVideoPath = $tempDir . '/twib_out_' . $uniqueId . '.mp4';
 
-// 4. Ambil gambar yang di-upload (bisa multipart file atau base64)
+// 4. Ambil gambar yang di-upload (bisa multipart file, base64, atau raw binary)
 $imageSaved = false;
 
 if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
@@ -121,8 +121,8 @@ if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
             if ($decoded !== false) {
                 $imageSaved = file_put_contents($tempPhotoPath, $decoded) !== false;
             }
-        } elseif (substr($rawInput, 0, 8) === "\x89PNG\r\n\x1a\n") {
-            // Raw binary PNG
+        } else {
+            // Raw binary JPG/PNG
             $imageSaved = file_put_contents($tempPhotoPath, $rawInput) !== false;
         }
     }
@@ -145,10 +145,10 @@ $fadeOffset = round($introDuration - $crossfadeDuration, 2); // 9.4s
 $photoDuration = round($holdDuration + $crossfadeDuration, 2); // 5.6s
 $totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
 
-// 6. Jalankan FFmpeg
-// Percobaan 1: Dengan Audio (jika video intro memiliki track audio)
+// 6. Jalankan FFmpeg dengan timebase synchronization (settb=AVTB)
+// Percobaan 1: Dengan Audio
 $filterWithAudio = sprintf(
-    '"[0:v][1:v]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad=whole_dur=%.2f[a]"',
+    '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad=whole_dur=%.2f[a]"',
     $crossfadeDuration,
     $fadeOffset,
     $totalDuration
@@ -168,10 +168,10 @@ $output = [];
 $returnVar = 0;
 exec($cmd, $output, $returnVar);
 
-// Jika gagal (kemungkinan karena tidak ada audio track pada input 0), coba render tanpa filter audio
+// Jika gagal, coba render video-only dengan sinkronisasi timebase
 if ($returnVar !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath) < 1000) {
     $filterVideoOnly = sprintf(
-        '"[0:v][1:v]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
+        '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
         $crossfadeDuration,
         $fadeOffset
     );
