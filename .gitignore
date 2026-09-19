@@ -14,4 +14,6 @@ scratch/
 .vscode/
 .idea/
 *.sublime-workspace
-*.sublime-project
+# Raw assets in root
+/*.mp4
+/*.mov

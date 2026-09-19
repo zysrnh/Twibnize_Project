@@ -21,8 +21,8 @@ const state = {
   animFrameId: null,
   totalVideoDuration: 5, // default
   holdPhotoDuration: 5,  // seconds to hold photo after video
-  aspectRatio: 1080 / 1350, // 4:5 Portrait Full HD
-  canvasSize: { width: 1080, height: 1350 }
+  aspectRatio: 1088 / 1360, // 4:5 Portrait (Hardware H.264 Multiple-of-16 compatible)
+  canvasSize: { width: 1088, height: 1360 }
 };
 
 // DOM Elements
@@ -133,21 +133,21 @@ function loadFirstAvailableImage(candidates, index) {
     state.frameImg.src = candidates[index];
     state.isFrameLoaded = true;
     
-    // KUNCI RESOLUSI TETAP KE 1080 x 1350 (4:5 Murni Portrait Instagram/WA)
-    state.aspectRatio = 1080 / 1350;
-    state.canvasSize = { width: 1080, height: 1350 };
+    // KUNCI RESOLUSI TETAP KE 1088 x 1360 (Rasio 4:5 Murni - Kompatibel Chip H.264)
+    state.aspectRatio = 1088 / 1360;
+    state.canvasSize = { width: 1088, height: 1360 };
     
     // Update dimensi canvas preview & render
     if (state.previewCanvas) {
-      state.previewCanvas.width = 1080;
-      state.previewCanvas.height = 1350;
+      state.previewCanvas.width = 1088;
+      state.previewCanvas.height = 1360;
     }
     if (state.renderCanvas) {
-      state.renderCanvas.width = 1080;
-      state.renderCanvas.height = 1350;
+      state.renderCanvas.width = 1088;
+      state.renderCanvas.height = 1360;
     }
 
-    // Auto Chroma Key (Hapus Green Screen Otomatis dengan resolusi 1080x1350)
+    // Auto Chroma Key (Hapus Green Screen Otomatis dengan resolusi 1088x1360)
     state.processedFrameCanvas = applyChromaKey(testImg);
     const transparentFrameDataUrl = state.processedFrameCanvas.toDataURL();
 
@@ -155,7 +155,7 @@ function loadFirstAvailableImage(candidates, index) {
       el.cropperFrameOverlay.src = transparentFrameDataUrl;
     }
     
-    console.log(`Menggunakan frame twibbon: ${candidates[index]} (TERKUNCI 1080x1350 - Rasio 4:5)`);
+    console.log(`Menggunakan frame twibbon: ${candidates[index]} (1088x1360 - Rasio 4:5)`);
   };
   testImg.onerror = () => {
     loadFirstAvailableImage(candidates, index + 1);
@@ -163,17 +163,17 @@ function loadFirstAvailableImage(candidates, index) {
 }
 
 /**
- * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon pada 1080x1350)
+ * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon pada 1088x1360)
  */
 function applyChromaKey(sourceImage) {
   const c = document.createElement('canvas');
-  c.width = 1080;
-  c.height = 1350;
+  c.width = 1088;
+  c.height = 1360;
   const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(sourceImage, 0, 0, 1080, 1350);
+  ctx.drawImage(sourceImage, 0, 0, 1088, 1360);
 
   try {
-    const imgData = ctx.getImageData(0, 0, 1080, 1350);
+    const imgData = ctx.getImageData(0, 0, 1088, 1360);
     const data = imgData.data;
 
     for (let i = 0; i < data.length; i += 4) {
@@ -181,7 +181,7 @@ function applyChromaKey(sourceImage) {
       const g = data[i + 1];
       const b = data[i + 2];
 
-      // Deteksi warna hijau green-screen:
+      // Deteksi warna hijau green-screen
       const maxRB = Math.max(r, b);
       if (g > 70 && g > maxRB * 1.25) {
         const diff = g - maxRB;
@@ -196,7 +196,7 @@ function applyChromaKey(sourceImage) {
 
     ctx.putImageData(imgData, 0, 0);
   } catch (e) {
-    console.warn('Gagal membaca pixel untuk chroma key (CORS/tainted canvas):', e);
+    console.warn('Gagal membaca pixel untuk chroma key:', e);
   }
 
   return c;
@@ -250,27 +250,23 @@ function updateVideoStatusBadge(isCustom, text) {
  */
 function createFallbackFrame() {
   const c = document.createElement('canvas');
-  c.width = 1080;
-  c.height = 1350;
+  c.width = 1088;
+  c.height = 1360;
   const ctx = c.getContext('2d');
 
-  // Outer frame
   ctx.fillStyle = '#162b3d';
-  ctx.fillRect(0, 0, 1080, 1350);
+  ctx.fillRect(0, 0, 1088, 1360);
 
-  // Cutout
-  ctx.clearRect(90, 180, 900, 900);
+  ctx.clearRect(94, 180, 900, 900);
 
-  // Border
   ctx.strokeStyle = '#b69861';
   ctx.lineWidth = 14;
-  ctx.strokeRect(90, 180, 900, 900);
+  ctx.strokeRect(94, 180, 900, 900);
 
-  // Text
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 42px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('TWIBBON PKKMB LPKIA 2026', 540, 1180);
+  ctx.fillText('TWIBBON PKKMB LPKIA 2026', 544, 1180);
 
   state.frameImg.src = c.toDataURL();
   state.isFrameLoaded = true;
@@ -303,7 +299,7 @@ function bindEvents() {
     }
   });
 
-  // Cropper Controls - Zoom Slider & Gestures
+  // Cropper Controls
   if (el.zoomSlider) {
     el.zoomSlider.addEventListener('input', (e) => {
       if (state.cropper) {
@@ -437,23 +433,22 @@ function openCropper(imageSrc) {
     state.cropper.destroy();
   }
 
-  // Update cropper container aspect-ratio
   const cropperContainer = el.cropperImage.parentElement;
   if (cropperContainer) {
     cropperContainer.style.aspectRatio = `${state.canvasSize.width} / ${state.canvasSize.height}`;
   }
 
   state.cropper = new Cropper(el.cropperImage, {
-    aspectRatio: state.aspectRatio || (1080 / 1350),
-    viewMode: 0, // Bebas digeser tanpa batas kaku
-    dragMode: 'move', // Menggeser foto langsung
-    autoCropArea: 1, // Pas 100% frame
+    aspectRatio: state.aspectRatio || (1088 / 1360),
+    viewMode: 0,
+    dragMode: 'move',
+    autoCropArea: 1,
     restore: false,
     guides: false,
     center: false,
     highlight: false,
-    cropBoxMovable: false, // Frame terkunci
-    cropBoxResizable: false, // Ukuran frame terkunci
+    cropBoxMovable: false,
+    cropBoxResizable: false,
     toggleDragModeOnDblclick: false,
     zoomOnTouch: true,
     zoomOnWheel: true,
@@ -488,7 +483,6 @@ function confirmCropAndProceed() {
     imageSmoothingQuality: 'high'
   });
 
-  // Update preview canvas aspect ratio
   if (state.previewCanvas && state.previewCanvas.parentElement) {
     state.previewCanvas.parentElement.style.aspectRatio = `${state.canvasSize.width} / ${state.canvasSize.height}`;
   }
@@ -496,7 +490,6 @@ function confirmCropAndProceed() {
   el.cropperSection.classList.add('hidden');
   el.previewSection.classList.remove('hidden');
 
-  // Mulai preview
   startPreviewPlayer();
 }
 
@@ -567,7 +560,6 @@ function runPreviewLoop() {
   previewState.currentTime = elapsed;
 
   if (previewState.currentTime >= previewState.totalDuration) {
-    // Selesai -> Loop kembali
     previewState.currentTime = 0;
     previewState.startTime = performance.now();
     if (state.hasCustomVideo) {
@@ -576,10 +568,7 @@ function runPreviewLoop() {
     }
   }
 
-  // Draw current frame to Preview Canvas
   renderFrameToCanvas(state.previewCtx, previewState.currentTime, previewState.introDuration);
-
-  // Update UI Progress
   updatePreviewUI();
 
   state.animFrameId = requestAnimationFrame(runPreviewLoop);
@@ -674,12 +663,12 @@ function drawCoverMedia(ctx, media, targetW, targetH) {
 
 /**
  * ----------------------------------------------------
- * CANVAS COMPOSITOR: RENDER 1 FRAME (1080x1350 4:5)
+ * CANVAS COMPOSITOR: RENDER 1 FRAME (1088x1360 4:5)
  * ----------------------------------------------------
  */
 function renderFrameToCanvas(ctx, time, introDuration) {
-  const width = state.canvasSize.width;   // 1080
-  const height = state.canvasSize.height; // 1350
+  const width = state.canvasSize.width;   // 1088
+  const height = state.canvasSize.height; // 1360
   const crossfadeDuration = 0.55; // 0.55 detik transisi crossfade halus
 
   ctx.imageSmoothingEnabled = true;
@@ -731,7 +720,7 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 }
 
 /**
- * Built-in Procedural Flat Intro Animation (for testing without external mp4)
+ * Built-in Procedural Flat Intro Animation
  */
 function drawProceduralIntro(ctx, time, duration, w, h) {
   const progress = time / duration;
@@ -770,7 +759,7 @@ function drawProceduralIntro(ctx, time, duration, w, h) {
 
 /**
  * ------------------------------------------------------------------
- * VIDEO EXPORT ENGINE (WebCodecs + Mp4Muxer / Deterministic Stepping)
+ * VIDEO EXPORT ENGINE (WebCodecs + Mp4Muxer / Hardware Accelerated)
  * ------------------------------------------------------------------
  */
 async function startVideoExport() {
@@ -790,8 +779,8 @@ async function startVideoExport() {
     const totalDuration = introDuration + state.holdPhotoDuration;
     const totalFrames = Math.ceil(totalDuration * fps);
 
-    const width = state.canvasSize.width;   // 1080
-    const height = state.canvasSize.height; // 1350
+    const width = state.canvasSize.width;   // 1088 (Kelipatan 16 chip iPhone & Android)
+    const height = state.canvasSize.height; // 1360 (Kelipatan 16 chip iPhone & Android)
 
     // Check if WebCodecs (VideoEncoder) and Mp4Muxer are available
     const supportsWebCodecs = typeof window.VideoEncoder !== 'undefined' && 
@@ -824,46 +813,7 @@ async function startVideoExport() {
 async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, totalFrames, width, height }) {
   updateExportProgress(5, 'Menginisialisasi encoder H.264 MP4...');
 
-  // 1. Setup Audio decoding if custom video exists
-  let audioBuffer = null;
-  if (state.hasCustomVideo && state.introVideo.src) {
-    try {
-      const response = await fetch(state.introVideo.src);
-      const arrayBuffer = await response.arrayBuffer();
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const audioCtx = new AudioCtx();
-      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    } catch (e) {
-      console.warn('Audio decoding skipped/failed:', e);
-    }
-  }
-
-  // Check if AudioEncoder and AAC are supported
-  let audioEncoder = null;
-  let hasAudioTrack = false;
-  let sampleRate = 44100;
-  let numberOfChannels = 2;
-
-  if (audioBuffer && typeof window.AudioEncoder !== 'undefined') {
-    sampleRate = audioBuffer.sampleRate;
-    numberOfChannels = Math.min(2, audioBuffer.numberOfChannels);
-    try {
-      const audioConfig = {
-        codec: 'mp4a.40.2',
-        sampleRate: sampleRate,
-        numberOfChannels: numberOfChannels,
-        bitrate: 128000
-      };
-      const isAudioSupported = await AudioEncoder.isConfigSupported(audioConfig);
-      if (isAudioSupported.supported) {
-        hasAudioTrack = true;
-      }
-    } catch (e) {
-      console.warn('AudioEncoder not supported for AAC:', e);
-    }
-  }
-
-  // 2. Setup Mp4Muxer
+  // Setup Mp4Muxer (Hardware Compatible)
   const muxerOptions = {
     target: new Mp4Muxer.ArrayBufferTarget(),
     video: {
@@ -874,22 +824,14 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
     fastStart: 'in-memory'
   };
 
-  if (hasAudioTrack) {
-    muxerOptions.audio = {
-      codec: 'aac',
-      numberOfChannels: numberOfChannels,
-      sampleRate: sampleRate
-    };
-  }
-
   const muxer = new Mp4Muxer.Muxer(muxerOptions);
 
-  // 3. Setup VideoEncoder (H.264 Baseline / Main Profile)
+  // Setup VideoEncoder (H.264 Baseline / Main Profile)
   let encoderConfig = {
     codec: 'avc1.420028', // H.264 Main Profile
     width: width,
     height: height,
-    bitrate: 6_000_000,   // 6 Mbps Crisp Full HD Portrait
+    bitrate: 5_000_000,   // 5 Mbps Crisp HD Portrait
     framerate: fps
   };
 
@@ -909,52 +851,7 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
 
   videoEncoder.configure(encoderConfig);
 
-  // 4. Setup AudioEncoder if active
-  if (hasAudioTrack) {
-    audioEncoder = new AudioEncoder({
-      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-      error: (e) => console.error('AudioEncoder error:', e)
-    });
-    audioEncoder.configure({
-      codec: 'mp4a.40.2',
-      sampleRate: sampleRate,
-      numberOfChannels: numberOfChannels,
-      bitrate: 128000
-    });
-
-    try {
-      const audioDuration = Math.min(totalDuration, audioBuffer.duration);
-      const totalAudioSamples = Math.floor(audioDuration * sampleRate);
-      const chunkSize = 1024;
-
-      for (let offset = 0; offset < totalAudioSamples; offset += chunkSize) {
-        const currentChunkSize = Math.min(chunkSize, totalAudioSamples - offset);
-        const audioDataPlanar = new Float32Array(currentChunkSize * numberOfChannels);
-
-        for (let ch = 0; ch < numberOfChannels; ch++) {
-          const channelData = audioBuffer.getChannelData(ch);
-          for (let s = 0; s < currentChunkSize; s++) {
-            audioDataPlanar[ch * currentChunkSize + s] = channelData[offset + s] || 0;
-          }
-        }
-
-        const audioDataObj = new AudioData({
-          format: 'f32-planar',
-          sampleRate: sampleRate,
-          numberOfFrames: currentChunkSize,
-          numberOfChannels: numberOfChannels,
-          timestamp: Math.round((offset / sampleRate) * 1000000)
-        });
-
-        audioEncoder.encode(audioDataObj);
-        audioDataObj.close();
-      }
-    } catch (err) {
-      console.warn('Audio chunk encoding failed:', err);
-    }
-  }
-
-  // 5. Deterministic Frame-by-Frame Video Stepping
+  // Deterministic Frame-by-Frame Video Stepping
   if (state.hasCustomVideo) {
     state.introVideo.pause();
   }
@@ -989,17 +886,14 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
     const percent = Math.min(98, Math.round((frameIndex / totalFrames) * 100));
     updateExportProgress(percent, `Merender video: frame ${frameIndex + 1}/${totalFrames} (${currentTime.toFixed(1)}s)`);
 
-    // Let browser breathe every few frames
-    if (frameIndex % 3 === 0) {
+    // Let browser breathe every 2 frames
+    if (frameIndex % 2 === 0) {
       await new Promise(r => setTimeout(r, 0));
     }
   }
 
   updateExportProgress(99, 'Menyelesaikan file MP4...');
 
-  if (audioEncoder) {
-    await audioEncoder.flush();
-  }
   await videoEncoder.flush();
   muxer.finalize();
 
@@ -1027,7 +921,7 @@ async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration,
 
   const mediaRecorder = new MediaRecorder(stream, {
     mimeType: mimeType,
-    videoBitsPerSecond: 10000000
+    videoBitsPerSecond: 8000000
   });
 
   const recordedChunks = [];
