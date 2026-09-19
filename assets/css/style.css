@@ -160,14 +160,14 @@ body {
   z-index: 20;
 }
 
-/* Canvas Viewport */
+/* Canvas Viewport 4:5 (1080x1350) */
 .canvas-preview-container {
   position: relative;
   width: 100%;
-  max-width: 460px;
+  max-width: 420px;
   margin: 0 auto;
-  aspect-ratio: 1 / 1;
-  background-color: #000000;
+  aspect-ratio: 4 / 5;
+  background-color: #0f172a;
   border: 2px solid var(--color-primary);
   border-radius: 4px;
   overflow: hidden;

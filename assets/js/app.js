@@ -21,8 +21,8 @@ const state = {
   animFrameId: null,
   totalVideoDuration: 5, // default
   holdPhotoDuration: 5,  // seconds to hold photo after video
-  aspectRatio: 1,        // 1:1 square
-  canvasSize: { width: 1080, height: 1080 }
+  aspectRatio: 1080 / 1350, // 4:5 Portrait Full HD
+  canvasSize: { width: 1080, height: 1350 }
 };
 
 // DOM Elements
@@ -651,38 +651,68 @@ function updatePreviewUI() {
 }
 
 /**
+ * Helper: Draw video / image with object-fit: cover on target canvas
+ */
+function drawCoverMedia(ctx, media, targetW, targetH) {
+  const srcW = media.videoWidth || media.naturalWidth || media.width || targetW;
+  const srcH = media.videoHeight || media.naturalHeight || media.height || targetH;
+  const srcRatio = srcW / srcH;
+  const targetRatio = targetW / targetH;
+
+  let renderW, renderH, offsetX, offsetY;
+
+  if (srcRatio > targetRatio) {
+    // Media lebih lebar -> scale by height dan crop kiri-kanan
+    renderH = targetH;
+    renderW = targetH * srcRatio;
+    offsetX = (targetW - renderW) / 2;
+    offsetY = 0;
+  } else {
+    // Media lebih tinggi -> scale by width dan crop atas-bawah
+    renderW = targetW;
+    renderH = targetW / srcRatio;
+    offsetX = 0;
+    offsetY = (targetH - renderH) / 2;
+  }
+
+  ctx.drawImage(media, offsetX, offsetY, renderW, renderH);
+}
+
+/**
  * ----------------------------------------------------
- * CANVAS COMPOSITOR: RENDER 1 FRAME
+ * CANVAS COMPOSITOR: RENDER 1 FRAME (1080x1350 4:5)
  * ----------------------------------------------------
  */
 function renderFrameToCanvas(ctx, time, introDuration) {
-  const width = state.canvasSize.width;
-  const height = state.canvasSize.height;
+  const width = state.canvasSize.width;   // 1080
+  const height = state.canvasSize.height; // 1350
   const crossfadeDuration = 0.55; // 0.55 detik transisi crossfade halus
 
-  // Clear canvas
-  ctx.fillStyle = '#000000';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // Base background
+  ctx.fillStyle = '#0f172a';
   ctx.fillRect(0, 0, width, height);
 
   const fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
 
   if (time < fadeStartTime) {
-    // PHASE 1: FULL INTRO VIDEO
+    // PHASE 1: FULL INTRO VIDEO (Cover 100% 4:5 tanpa garis hitam)
     if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
-      ctx.drawImage(state.introVideo, 0, 0, width, height);
+      drawCoverMedia(ctx, state.introVideo, width, height);
     } else {
       drawProceduralIntro(ctx, time, introDuration, width, height);
     }
   } else if (time >= fadeStartTime && time < introDuration) {
-    // PHASE 1.5: MAGICAL STARBURST CROSSFADE (Transisi Bintang Emas)
-    // 1. Gambar Video Frame (Ledakan Sihir Bintang Emas)
+    // PHASE 1.5: MAGICAL STARBURST CROSSFADE (Cover 100% 4:5)
     if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
-      ctx.drawImage(state.introVideo, 0, 0, width, height);
+      drawCoverMedia(ctx, state.introVideo, width, height);
     } else {
       drawProceduralIntro(ctx, time, introDuration, width, height);
     }
 
-    // 2. Blend Twibbon + Foto Maba muncul dari balik kilau bintang
+    // Blend Twibbon + Foto Maba muncul dari balik kilau bintang
     const progress = (time - fadeStartTime) / crossfadeDuration;
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, progress));
@@ -696,7 +726,7 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 
     ctx.restore();
   } else {
-    // PHASE 2: FULL TWIBBON + FOTO MABA
+    // PHASE 2: FULL TWIBBON + FOTO MABA (100% 4:5)
     // 1. Draw Cropped Photo
     if (state.croppedCanvas) {
       ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
@@ -813,7 +843,7 @@ async function startVideoExport() {
 
     const mediaRecorder = new MediaRecorder(stream, {
       mimeType: mimeType,
-      videoBitsPerSecond: 8000000 // 8 Mbps High Quality
+      videoBitsPerSecond: 16000000 // 16 Mbps Ultra Crisp High Resolution
     });
 
     const recordedChunks = [];
@@ -827,7 +857,7 @@ async function startVideoExport() {
       updateExportProgress(100, 'Selesai! Mengunduh video...');
       const blob = new Blob(recordedChunks, { type: mimeType });
       const extension = mimeType.includes('mp4') ? 'mp4' : 'mp4'; // Modern player accepts standard extension
-      const filename = `Twibbon_Maba_${Date.now()}.${extension}`;
+      const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.${extension}`;
 
       downloadBlob(blob, filename);
 
@@ -838,8 +868,8 @@ async function startVideoExport() {
         Swal.fire({
           icon: 'success',
           title: 'Video Berhasil Dibuat!',
-          text: `File ${filename} sudah otomatis di-download.`,
-          confirmButtonColor: '#1e40af'
+          text: `File ${filename} berhasil diunduh dengan kualitas Ultra HD (4:5).`,
+          confirmButtonColor: '#162b3d'
         });
       }, 800);
     };
