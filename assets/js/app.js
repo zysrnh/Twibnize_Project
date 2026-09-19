@@ -612,7 +612,7 @@ function exportPatientWebCodecs() {
   return new Promise(function(resolve, reject) {
     (async function() {
       try {
-        var fps = 24;
+        var fps = 30;
         var width = 1080;
         var height = 1350;
 
