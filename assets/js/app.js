@@ -10,7 +10,7 @@ const state = {
   croppedCanvas: null,
   frameImg: new Image(),
   introVideo: document.createElement('video'),
-  hasCustomVideo: false,
+  hasCustomVideo: true,
   isVideoLoaded: false,
   isFrameLoaded: false,
   isRendering: false,
@@ -19,10 +19,10 @@ const state = {
   renderCanvas: null,
   renderCtx: null,
   animFrameId: null,
-  totalVideoDuration: 5, // default
-  holdPhotoDuration: 5,  // seconds to hold photo after video
-  aspectRatio: 1088 / 1360, // 4:5 Portrait (Hardware H.264 Multiple-of-16 compatible)
-  canvasSize: { width: 1088, height: 1360 }
+  totalVideoDuration: 10, // default intro duration
+  holdPhotoDuration: 5,   // seconds to hold photo after video
+  aspectRatio: 1080 / 1350, // 4:5 Portrait Full HD
+  canvasSize: { width: 1080, height: 1350 }
 };
 
 // DOM Elements
@@ -112,17 +112,14 @@ function loadDefaultAssets() {
     'assets/videos/Framenaur.mp4',
     'assets/Framenaur.mp4',
     'Framenaur.mp4',
-    'assets/videos/frame.mp4',
-    'assets/frame.mp4',
-    'frame.mp4'
+    'assets/videos/twibbon_ppkkmb.mp4'
   ];
   loadFirstAvailableVideo(videoCandidates, 0);
 }
 
 function loadFirstAvailableImage(candidates, index) {
   if (index >= candidates.length) {
-    console.warn('File frame twibbon tidak ditemukan, menggunakan fallback.');
-    createFallbackFrame();
+    console.warn('File frame twibbon tidak ditemukan.');
     return;
   }
   
@@ -133,21 +130,19 @@ function loadFirstAvailableImage(candidates, index) {
     state.frameImg.src = candidates[index];
     state.isFrameLoaded = true;
     
-    // KUNCI RESOLUSI TETAP KE 1088 x 1360 (Rasio 4:5 Murni - Kompatibel Chip H.264)
-    state.aspectRatio = 1088 / 1360;
-    state.canvasSize = { width: 1088, height: 1360 };
+    state.aspectRatio = 1080 / 1350;
+    state.canvasSize = { width: 1080, height: 1350 };
     
-    // Update dimensi canvas preview & render
     if (state.previewCanvas) {
-      state.previewCanvas.width = 1088;
-      state.previewCanvas.height = 1360;
+      state.previewCanvas.width = 1080;
+      state.previewCanvas.height = 1350;
     }
     if (state.renderCanvas) {
-      state.renderCanvas.width = 1088;
-      state.renderCanvas.height = 1360;
+      state.renderCanvas.width = 1080;
+      state.renderCanvas.height = 1350;
     }
 
-    // Auto Chroma Key (Hapus Green Screen Otomatis dengan resolusi 1088x1360)
+    // Auto Chroma Key (Hapus Green Screen Otomatis)
     state.processedFrameCanvas = applyChromaKey(testImg);
     const transparentFrameDataUrl = state.processedFrameCanvas.toDataURL();
 
@@ -155,7 +150,7 @@ function loadFirstAvailableImage(candidates, index) {
       el.cropperFrameOverlay.src = transparentFrameDataUrl;
     }
     
-    console.log(`Menggunakan frame twibbon: ${candidates[index]} (1088x1360 - Rasio 4:5)`);
+    console.log(`Menggunakan frame twibbon: ${candidates[index]} (1080x1350 - 4:5)`);
   };
   testImg.onerror = () => {
     loadFirstAvailableImage(candidates, index + 1);
@@ -163,17 +158,17 @@ function loadFirstAvailableImage(candidates, index) {
 }
 
 /**
- * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon pada 1088x1360)
+ * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon pada 1080x1350)
  */
 function applyChromaKey(sourceImage) {
   const c = document.createElement('canvas');
-  c.width = 1088;
-  c.height = 1360;
+  c.width = 1080;
+  c.height = 1350;
   const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(sourceImage, 0, 0, 1088, 1360);
+  ctx.drawImage(sourceImage, 0, 0, 1080, 1350);
 
   try {
-    const imgData = ctx.getImageData(0, 0, 1088, 1360);
+    const imgData = ctx.getImageData(0, 0, 1080, 1350);
     const data = imgData.data;
 
     for (let i = 0; i < data.length; i += 4) {
@@ -188,7 +183,6 @@ function applyChromaKey(sourceImage) {
         if (diff > 35) {
           data[i + 3] = 0; // Transparan 100%
         } else {
-          // Semi-transparan di tepian (anti-aliasing halus)
           data[i + 3] = Math.round(255 * (1 - (diff / 35)));
         }
       }
@@ -204,10 +198,7 @@ function applyChromaKey(sourceImage) {
 
 function loadFirstAvailableVideo(candidates, index) {
   if (index >= candidates.length) {
-    console.info('Video MP4 kustom belum ada, sistem menggunakan generator animasi intro demo.');
-    state.isVideoLoaded = true;
-    state.hasCustomVideo = false;
-    updateVideoStatusBadge(false, 'Mode Demo (Animasi Intro Bawaan)');
+    console.warn('Video intro tidak ditemukan pada path default.');
     return;
   }
 
@@ -222,6 +213,7 @@ function loadFirstAvailableVideo(candidates, index) {
     state.introVideo.src = vSrc;
     state.isVideoLoaded = true;
     state.hasCustomVideo = true;
+    state.totalVideoDuration = testVid.duration || 10;
     updateVideoStatusBadge(true, `Video Siap (${vSrc} - ${testVid.duration.toFixed(1)}s)`);
     console.log(`Menggunakan video: ${vSrc} (${testVid.duration.toFixed(1)}s)`);
   };
@@ -243,33 +235,6 @@ function updateVideoStatusBadge(isCustom, text) {
     el.videoStatusBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300';
     el.videoStatusBadge.innerHTML = `<span class="w-2 h-2 mr-1.5 bg-amber-500 rounded-full"></span> ${text}`;
   }
-}
-
-/**
- * Fallback Frame if SVG is not yet available
- */
-function createFallbackFrame() {
-  const c = document.createElement('canvas');
-  c.width = 1088;
-  c.height = 1360;
-  const ctx = c.getContext('2d');
-
-  ctx.fillStyle = '#162b3d';
-  ctx.fillRect(0, 0, 1088, 1360);
-
-  ctx.clearRect(94, 180, 900, 900);
-
-  ctx.strokeStyle = '#b69861';
-  ctx.lineWidth = 14;
-  ctx.strokeRect(94, 180, 900, 900);
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 42px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('TWIBBON PKKMB LPKIA 2026', 544, 1180);
-
-  state.frameImg.src = c.toDataURL();
-  state.isFrameLoaded = true;
 }
 
 /**
@@ -369,7 +334,7 @@ function bindEvents() {
           Swal.fire({
             icon: 'success',
             title: 'Frame Twibbon Diganti',
-            text: `Menggunakan frame: ${file.name} (Auto Green-Screen Hilang)`,
+            text: `Menggunakan frame: ${file.name}`,
             confirmButtonColor: '#162b3d'
           });
         };
@@ -439,7 +404,7 @@ function openCropper(imageSrc) {
   }
 
   state.cropper = new Cropper(el.cropperImage, {
-    aspectRatio: state.aspectRatio || (1088 / 1360),
+    aspectRatio: 1080 / 1350,
     viewMode: 0,
     dragMode: 'move',
     autoCropArea: 1,
@@ -475,7 +440,6 @@ function confirmCropAndProceed() {
 
   setStep(3);
 
-  // Dapatkan hasil crop dengan resolusi tajam
   state.croppedCanvas = state.cropper.getCroppedCanvas({
     width: state.canvasSize.width,
     height: state.canvasSize.height,
@@ -525,17 +489,17 @@ function resetToUpload() {
 let previewState = {
   isPlaying: false,
   currentTime: 0,
-  introDuration: 3,
-  totalDuration: 8,
+  introDuration: 10,
+  totalDuration: 15,
   startTime: 0
 };
 
 function startPreviewPlayer() {
   stopPreviewPlayer();
 
-  const introDuration = state.hasCustomVideo && state.introVideo.duration && !isNaN(state.introVideo.duration)
+  const introDuration = state.introVideo.duration && !isNaN(state.introVideo.duration)
     ? state.introVideo.duration
-    : 3.5;
+    : 10.0;
 
   previewState.introDuration = introDuration;
   previewState.totalDuration = introDuration + state.holdPhotoDuration;
@@ -543,10 +507,8 @@ function startPreviewPlayer() {
   previewState.isPlaying = true;
   previewState.startTime = performance.now();
 
-  if (state.hasCustomVideo) {
-    state.introVideo.currentTime = 0;
-    state.introVideo.play().catch(e => console.log('Autoplay muted preview'));
-  }
+  state.introVideo.currentTime = 0;
+  state.introVideo.play().catch(e => console.log('Autoplay muted preview'));
 
   updatePlayButtonIcon(true);
   runPreviewLoop();
@@ -560,12 +522,11 @@ function runPreviewLoop() {
   previewState.currentTime = elapsed;
 
   if (previewState.currentTime >= previewState.totalDuration) {
+    // Selesai -> Loop kembali
     previewState.currentTime = 0;
     previewState.startTime = performance.now();
-    if (state.hasCustomVideo) {
-      state.introVideo.currentTime = 0;
-      state.introVideo.play().catch(() => {});
-    }
+    state.introVideo.currentTime = 0;
+    state.introVideo.play().catch(() => {});
   }
 
   renderFrameToCanvas(state.previewCtx, previewState.currentTime, previewState.introDuration);
@@ -577,16 +538,14 @@ function runPreviewLoop() {
 function togglePreviewPlayback() {
   if (previewState.isPlaying) {
     previewState.isPlaying = false;
-    if (state.hasCustomVideo) state.introVideo.pause();
+    state.introVideo.pause();
     updatePlayButtonIcon(false);
   } else {
     previewState.isPlaying = true;
     previewState.startTime = performance.now() - (previewState.currentTime * 1000);
-    if (state.hasCustomVideo) {
-      state.introVideo.currentTime = Math.min(previewState.currentTime, state.introVideo.duration || 0);
-      if (previewState.currentTime < previewState.introDuration) {
-        state.introVideo.play().catch(() => {});
-      }
+    state.introVideo.currentTime = Math.min(previewState.currentTime, state.introVideo.duration || 0);
+    if (previewState.currentTime < previewState.introDuration) {
+      state.introVideo.play().catch(() => {});
     }
     updatePlayButtonIcon(true);
     runPreviewLoop();
@@ -600,7 +559,7 @@ function restartPreviewPlayback() {
 function stopPreviewPlayer() {
   previewState.isPlaying = false;
   if (state.animFrameId) cancelAnimationFrame(state.animFrameId);
-  if (state.hasCustomVideo) state.introVideo.pause();
+  state.introVideo.pause();
 }
 
 function updatePlayButtonIcon(isPlaying) {
@@ -663,39 +622,30 @@ function drawCoverMedia(ctx, media, targetW, targetH) {
 
 /**
  * ----------------------------------------------------
- * CANVAS COMPOSITOR: RENDER 1 FRAME (1088x1360 4:5)
+ * CANVAS COMPOSITOR: RENDER 1 FRAME (1080x1350 4:5)
  * ----------------------------------------------------
  */
 function renderFrameToCanvas(ctx, time, introDuration) {
-  const width = state.canvasSize.width;   // 1088
-  const height = state.canvasSize.height; // 1360
-  const crossfadeDuration = 0.55; // 0.55 detik transisi crossfade halus
+  const width = state.canvasSize.width;   // 1080
+  const height = state.canvasSize.height; // 1350
+  const crossfadeDuration = 0.6; // 0.6 detik transisi ledakan bintang emas
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Base background
+  // Base background dark navy
   ctx.fillStyle = '#162b3d';
   ctx.fillRect(0, 0, width, height);
 
   const fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
 
   if (time < fadeStartTime) {
-    // PHASE 1: FULL INTRO VIDEO (Cover 100% 4:5)
-    if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
-      drawCoverMedia(ctx, state.introVideo, width, height);
-    } else {
-      drawProceduralIntro(ctx, time, introDuration, width, height);
-    }
+    // PHASE 1: FULL INTRO VIDEO (Animasi Burung Hantu Sihir)
+    drawCoverMedia(ctx, state.introVideo, width, height);
   } else if (time >= fadeStartTime && time < introDuration) {
-    // PHASE 1.5: MAGICAL STARBURST CROSSFADE
-    if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
-      drawCoverMedia(ctx, state.introVideo, width, height);
-    } else {
-      drawProceduralIntro(ctx, time, introDuration, width, height);
-    }
+    // PHASE 1.5: CROSSFADE PADA KILAU BINTANG EMAS
+    drawCoverMedia(ctx, state.introVideo, width, height);
 
-    // Blend Twibbon + Foto Maba
     const progress = (time - fadeStartTime) / crossfadeDuration;
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, progress));
@@ -720,46 +670,8 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 }
 
 /**
- * Built-in Procedural Flat Intro Animation
- */
-function drawProceduralIntro(ctx, time, duration, w, h) {
-  const progress = time / duration;
-
-  ctx.fillStyle = '#162b3d';
-  ctx.fillRect(0, 0, w, h);
-
-  const boxScale = Math.min(1, progress * 1.5);
-  ctx.fillStyle = '#830106';
-  ctx.fillRect(w/2 - (400 * boxScale), h/2 - (240 * boxScale), 800 * boxScale, 480 * boxScale);
-
-  ctx.strokeStyle = '#b69861';
-  ctx.lineWidth = 12;
-  ctx.strokeRect(w/2 - (420 * boxScale), h/2 - (260 * boxScale), 840 * boxScale, 520 * boxScale);
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 54px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  if (progress < 0.5) {
-    ctx.fillText('WELCOME TO', w/2, h/2 - 40);
-    ctx.fillStyle = '#b69861';
-    ctx.font = 'bold 64px sans-serif';
-    ctx.fillText('LPKIA 2026', w/2, h/2 + 40);
-  } else {
-    ctx.fillText('OFFICIAL TWIBBON', w/2, h/2 - 40);
-    ctx.fillStyle = '#b69861';
-    ctx.font = 'bold 72px sans-serif';
-    ctx.fillText('SADAJIWA IDE', w/2, h/2 + 50);
-  }
-
-  ctx.fillStyle = '#b69861';
-  ctx.fillRect(0, h - 24, w * progress, 24);
-}
-
-/**
  * ------------------------------------------------------------------
- * VIDEO EXPORT ENGINE (WebCodecs + Mp4Muxer / Hardware Accelerated)
+ * VIDEO EXPORT ENGINE (WebCodecs + Mp4Muxer / Ultra HD H.264 MP4)
  * ------------------------------------------------------------------
  */
 async function startVideoExport() {
@@ -769,20 +681,19 @@ async function startVideoExport() {
 
   // Show processing modal
   el.processingModal.classList.remove('hidden');
-  updateExportProgress(0, 'Menyiapkan mesin render MP4...');
+  updateExportProgress(0, 'Menyiapkan mesin render Ultra HD...');
 
   try {
     const fps = 30;
-    const introDuration = state.hasCustomVideo && state.introVideo.duration && !isNaN(state.introVideo.duration)
+    const introDuration = state.introVideo.duration && !isNaN(state.introVideo.duration)
       ? state.introVideo.duration
-      : 3.5;
+      : 10.0;
     const totalDuration = introDuration + state.holdPhotoDuration;
     const totalFrames = Math.ceil(totalDuration * fps);
 
-    const width = state.canvasSize.width;   // 1088 (Kelipatan 16 chip iPhone & Android)
-    const height = state.canvasSize.height; // 1360 (Kelipatan 16 chip iPhone & Android)
+    const width = state.canvasSize.width;   // 1080
+    const height = state.canvasSize.height; // 1350
 
-    // Check if WebCodecs (VideoEncoder) and Mp4Muxer are available
     const supportsWebCodecs = typeof window.VideoEncoder !== 'undefined' && 
                               typeof window.VideoFrame !== 'undefined' && 
                               typeof window.Mp4Muxer !== 'undefined';
@@ -808,12 +719,11 @@ async function startVideoExport() {
 }
 
 /**
- * Primary Exporter: True ISO MP4 with WebCodecs & Mp4Muxer (Guaranteed 30 FPS on all phones & iOS)
+ * Primary Exporter: True ISO MP4 with WebCodecs & Mp4Muxer (10 Mbps Crisp Ultra HD)
  */
 async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, totalFrames, width, height }) {
-  updateExportProgress(5, 'Menginisialisasi encoder H.264 MP4...');
+  updateExportProgress(5, 'Menginisialisasi encoder H.264 MP4 (10 Mbps)...');
 
-  // Setup Mp4Muxer (Hardware Compatible)
   const muxerOptions = {
     target: new Mp4Muxer.ArrayBufferTarget(),
     video: {
@@ -826,19 +736,18 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
 
   const muxer = new Mp4Muxer.Muxer(muxerOptions);
 
-  // Setup VideoEncoder (H.264 Baseline / Main Profile)
   let encoderConfig = {
     codec: 'avc1.420028', // H.264 Main Profile
     width: width,
     height: height,
-    bitrate: 5_000_000,   // 5 Mbps Crisp HD Portrait
+    bitrate: 10_000_000,  // 10 Mbps Ultra Crisp High Definition
     framerate: fps
   };
 
   try {
     const isVideoSupported = await VideoEncoder.isConfigSupported(encoderConfig);
     if (!isVideoSupported.supported) {
-      encoderConfig.codec = 'avc1.42001f'; // H.264 Baseline Profile fallback
+      encoderConfig.codec = 'avc1.42001f';
     }
   } catch (e) {
     encoderConfig.codec = 'avc1.42001f';
@@ -851,10 +760,7 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
 
   videoEncoder.configure(encoderConfig);
 
-  // Deterministic Frame-by-Frame Video Stepping
-  if (state.hasCustomVideo) {
-    state.introVideo.pause();
-  }
+  state.introVideo.pause();
 
   const renderCanvas = state.renderCanvas;
   const renderCtx = state.renderCtx;
@@ -862,16 +768,13 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
   for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
     const currentTime = frameIndex / fps;
 
-    // Deterministic seek video
-    if (state.hasCustomVideo && currentTime <= introDuration) {
+    if (currentTime <= introDuration) {
       state.introVideo.currentTime = Math.min(currentTime, Math.max(0, (state.introVideo.duration || 0.1) - 0.05));
       await waitForSeek(state.introVideo);
     }
 
-    // Render exact frame
     renderFrameToCanvas(renderCtx, currentTime, introDuration);
 
-    // Create VideoFrame & encode
     const timestampUs = Math.round(frameIndex * (1000000 / fps));
     const isKeyFrame = frameIndex % 30 === 0;
 
@@ -882,11 +785,9 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
     videoEncoder.encode(vFrame, { keyFrame: isKeyFrame });
     vFrame.close();
 
-    // Progress update
     const percent = Math.min(98, Math.round((frameIndex / totalFrames) * 100));
-    updateExportProgress(percent, `Merender video: frame ${frameIndex + 1}/${totalFrames} (${currentTime.toFixed(1)}s)`);
+    updateExportProgress(percent, `Merender video Ultra HD: frame ${frameIndex + 1}/${totalFrames} (${currentTime.toFixed(1)}s)`);
 
-    // Let browser breathe every 2 frames
     if (frameIndex % 2 === 0) {
       await new Promise(r => setTimeout(r, 0));
     }
@@ -908,7 +809,7 @@ async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, tot
 }
 
 /**
- * Fallback Exporter: MediaRecorder with Best Available Format
+ * Fallback Exporter: MediaRecorder with Best Available Format (12 Mbps)
  */
 async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration, totalFrames, width, height }) {
   const stream = state.renderCanvas.captureStream(fps);
@@ -921,7 +822,7 @@ async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration,
 
   const mediaRecorder = new MediaRecorder(stream, {
     mimeType: mimeType,
-    videoBitsPerSecond: 8000000
+    videoBitsPerSecond: 12000000
   });
 
   const recordedChunks = [];
@@ -941,15 +842,12 @@ async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration,
   });
 
   mediaRecorder.start();
-
-  if (state.hasCustomVideo) {
-    state.introVideo.pause();
-  }
+  state.introVideo.pause();
 
   for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
     const currentTime = frameIndex / fps;
 
-    if (state.hasCustomVideo && currentTime <= introDuration) {
+    if (currentTime <= introDuration) {
       state.introVideo.currentTime = Math.min(currentTime, Math.max(0, (state.introVideo.duration || 0.1) - 0.05));
       await waitForSeek(state.introVideo);
     }
@@ -957,7 +855,7 @@ async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration,
     renderFrameToCanvas(state.renderCtx, currentTime, introDuration);
 
     const percent = Math.min(99, Math.round((frameIndex / totalFrames) * 100));
-    updateExportProgress(percent, `Merender video: frame ${frameIndex + 1}/${totalFrames}`);
+    updateExportProgress(percent, `Merender video Ultra HD: frame ${frameIndex + 1}/${totalFrames}`);
 
     await new Promise(r => setTimeout(r, 1000 / fps));
   }
@@ -993,7 +891,7 @@ function finishExport(filename) {
     Swal.fire({
       icon: 'success',
       title: 'Video Berhasil Dibuat!',
-      text: `File ${filename} berhasil diunduh dengan format MP4 Full HD (4:5) terkunci 30 FPS mulus.`,
+      text: `File ${filename} berhasil diunduh dengan format MP4 Ultra HD (4:5) jernih dan mulus.`,
       confirmButtonColor: '#162b3d'
     });
   }, 600);
