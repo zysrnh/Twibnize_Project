@@ -2,11 +2,29 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Twibbon Video Generator - Mahasiswa Baru</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Twibbon Video Maker - PKKMB SADAJIWA IDE LPKIA 2026</title>
+  
+  <!-- Favicon Logo PKKMB -->
+  <link rel="icon" type="image/png" href="Logo_PKKMB.png">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            pkkmb: {
+              blue: '#162b3d',
+              gold: '#b69861',
+              red: '#830106'
+            }
+          }
+        }
+      }
+    }
+  </script>
   
   <!-- Cropper.js CSS & JS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
@@ -18,131 +36,163 @@
   <!-- Custom Flat CSS -->
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between">
+<body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between select-none">
 
-  <!-- TOP NAVBAR -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+  <!-- TOP APP NAVBAR -->
+  <header class="bg-[#162b3d] text-white border-b-2 border-[#b69861] sticky top-0 z-30 shadow-md">
+    <div class="max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      
+      <!-- Brand & PKKMB Logo -->
       <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 bg-blue-700 flex items-center justify-center text-white font-black text-lg rounded-sm">
-          T
+        <div class="w-10 h-10 bg-white p-1 rounded flex items-center justify-center border border-[#b69861] shrink-0">
+          <img src="Logo_PKKMB.png" alt="Logo PKKMB LPKIA" class="w-full h-full object-contain">
         </div>
         <div>
-          <h1 class="font-extrabold text-slate-900 text-base md:text-lg leading-tight">
-            Twibbon Video Maker
+          <h1 class="font-extrabold text-sm sm:text-base leading-tight text-white tracking-wide">
+            PKKMB SADAJIWA IDE
           </h1>
-          <p class="text-xs text-slate-500 font-medium">Mahasiswa Baru 2026</p>
+          <p class="text-[11px] text-[#b69861] font-bold tracking-wider uppercase">LPKIA 2026</p>
         </div>
       </div>
 
+      <!-- Made by zysrnh Badge & Settings -->
       <div class="flex items-center space-x-2">
-        <span id="video-status-badge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300">
-          Memuat sistem...
-        </span>
-        <button onclick="document.getElementById('settings-modal').classList.toggle('hidden')" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs text-slate-700">
-          <svg class="w-4 h-4 mr-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <a href="https://zysrnh.my.id/" target="_blank" rel="noopener noreferrer" 
+           title="Made by zysrnh"
+           class="flex items-center space-x-1.5 bg-white text-[#162b3d] hover:bg-slate-50 px-2 py-1 rounded border border-[#b69861] transition-all hover:scale-105 shadow-sm">
+          <div class="w-5 h-5 bg-white rounded-full flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+            <img src="zyrsnh.png" alt="zysrnh logo" class="w-full h-full object-contain">
+          </div>
+          <span class="text-[10px] sm:text-[11px] font-extrabold tracking-tight">by zysrnh</span>
+        </a>
+
+        <button onclick="document.getElementById('settings-modal').classList.toggle('hidden')" class="flat-btn bg-[#0f1f2d] hover:bg-[#162b3d] text-slate-200 border border-slate-700 p-1.5 rounded text-xs" title="Pengaturan">
+          <svg class="w-4 h-4 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          Pengaturan
         </button>
       </div>
     </div>
   </header>
 
-  <!-- MAIN CONTAINER -->
-  <main class="max-w-3xl w-full mx-auto p-4 sm:p-6 flex-1 flex flex-col justify-center">
+  <!-- STEP PROGRESS WIZARD (App-Like) -->
+  <div class="bg-white border-b border-slate-200">
+    <div class="max-w-3xl mx-auto px-4 py-2 flex items-center justify-between">
+      <div id="step-1-pill" class="step-item active">
+        <span class="step-badge">1</span>
+        <span>Upload Foto</span>
+      </div>
+      <div class="w-6 sm:w-12 h-[2px] bg-slate-200"></div>
+      <div id="step-2-pill" class="step-item">
+        <span class="step-badge">2</span>
+        <span>Atur Posisi</span>
+      </div>
+      <div class="w-6 sm:w-12 h-[2px] bg-slate-200"></div>
+      <div id="step-3-pill" class="step-item">
+        <span class="step-badge">3</span>
+        <span>Download</span>
+      </div>
+    </div>
+  </div>
 
-    <!-- STEP 1: UPLOAD PHOTO CARD -->
-    <div id="upload-dropzone" class="flat-card p-6 sm:p-10 text-center border-2 border-dashed border-slate-300 hover:border-blue-700 bg-white transition-colors cursor-pointer">
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-3xl w-full mx-auto p-3 sm:p-5 flex-1 flex flex-col justify-center">
+
+    <!-- STEP 1: UPLOAD PHOTO CARD (App Style) -->
+    <div id="upload-dropzone" class="flat-card p-6 sm:p-10 text-center border-2 border-dashed border-slate-300 hover:border-[#b69861] bg-white transition-all cursor-pointer animate-pulse-border">
       <input type="file" id="file-input" accept="image/*" class="hidden">
       
-      <div class="mx-auto w-16 h-16 bg-blue-50 border border-blue-200 flex items-center justify-center rounded mb-4 text-blue-700">
+      <div class="mx-auto w-16 h-16 bg-[#162b3d] border-2 border-[#b69861] flex items-center justify-center rounded mb-4 text-[#b69861] shadow-sm">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </div>
 
-      <h2 class="text-xl font-bold text-slate-800 mb-1">Upload Foto Mahasiswa Baru</h2>
-      <p class="text-sm text-slate-500 max-w-md mx-auto mb-6">
-        Pilih foto terbaikmu. Kamu bisa menggeser, memperbesar, dan mengatur posisi agar pas dengan frame twibbon.
+      <h2 class="text-lg sm:text-xl font-extrabold text-[#162b3d] mb-1">Upload Foto Mahasiswa Baru</h2>
+      <p class="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-6">
+        Pilih foto terbaikmu untuk dimasukkan ke dalam Twibbon Animasi Video PKKMB 2026.
       </p>
 
-      <button onclick="document.getElementById('file-input').click()" class="flat-btn flat-btn-primary px-6 py-3 text-sm">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <button onclick="document.getElementById('file-input').click()" class="flat-btn flat-btn-primary px-6 py-3 text-sm tracking-wide shadow-sm w-full sm:w-auto">
+        <svg class="w-5 h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
         </svg>
-        Pilih Foto Dari Galeri / File
+        Pilih Dari Galeri HP / File
       </button>
 
-      <p class="text-xs text-slate-400 mt-4">Mendukung format: JPG, PNG, WEBP (Maksimal 15MB)</p>
+      <div class="mt-4 flex items-center justify-center space-x-2 text-[11px] text-slate-400">
+        <span>JPG, PNG, WEBP</span>
+        <span>&bull;</span>
+        <span class="text-[#830106] font-semibold">Maks 15MB</span>
+      </div>
     </div>
 
     <!-- STEP 2: CROPPER SECTION (Hidden by default) -->
-    <div id="cropper-section" class="hidden flat-card p-4 sm:p-6 bg-white">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+    <div id="cropper-section" class="hidden flat-card p-3 sm:p-5 bg-white">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-2.5 mb-3">
         <div>
-          <h2 class="font-bold text-slate-900 text-base">Atur &amp; Paskan Foto</h2>
-          <p class="text-xs text-slate-500">Geser atau zoom foto agar pas di dalam frame</p>
+          <h2 class="font-extrabold text-[#162b3d] text-sm sm:text-base">Atur &amp; Paskan Foto</h2>
+          <p class="text-[11px] text-slate-500">Geser dan perbesar foto agar pas di lubang twibbon</p>
         </div>
-        <label class="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer bg-slate-50 px-2 py-1 border border-slate-200 rounded">
-          <input type="checkbox" id="toggle-frame-guide" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+        <label class="flex items-center space-x-1.5 text-[11px] font-bold text-[#162b3d] cursor-pointer bg-slate-50 px-2 py-1 border border-slate-200 rounded">
+          <input type="checkbox" id="toggle-frame-guide" checked class="rounded border-slate-300 text-[#162b3d] focus:ring-[#b69861]">
           <span>Panduan Frame</span>
         </label>
       </div>
 
-      <!-- CROPPER VIEWPORT -->
-      <div class="relative w-full aspect-square bg-slate-900 overflow-hidden border border-slate-300 mb-3 max-w-[460px] mx-auto cursor-grab active:cursor-grabbing">
+      <!-- CROPPER VIEWPORT (Full Twibbonize Free Move) -->
+      <div class="relative w-full aspect-square bg-[#0f172a] overflow-hidden border-2 border-[#162b3d] mb-2 max-w-[460px] mx-auto cursor-grab active:cursor-grabbing rounded">
         <img id="cropper-image" src="" alt="Cropper Target" class="max-w-full block">
         <!-- Overlay Frame Guide (Auto Transparent Center) -->
-        <img id="cropper-frame-overlay" src="assets/frame.svg" alt="Frame Guide" class="crop-frame-guide">
+        <img id="cropper-frame-overlay" src="twibon.svg" alt="Frame Guide" class="crop-frame-guide">
       </div>
 
       <!-- INTERACTION HINT -->
-      <p class="text-center text-[11px] text-slate-500 mb-3">
+      <p class="text-center text-[11px] text-slate-500 mb-2.5">
         👆 <b>Sentuh / Drag</b> foto untuk menggeser. Gunakan <b>Slider</b> atau <b>cubit layar</b> untuk zoom.
       </p>
 
       <!-- ZOOM SLIDER & TOOLBAR -->
-      <div class="max-w-[460px] mx-auto bg-slate-50 border border-slate-200 p-3 rounded mb-4">
+      <div class="max-w-[460px] mx-auto bg-slate-50 border border-slate-200 p-2.5 rounded mb-3">
         <!-- Zoom Slider -->
-        <div class="flex items-center space-x-3 mb-3">
-          <span class="text-xs font-semibold text-slate-600 flex items-center min-w-[50px]">
-            <svg class="w-4 h-4 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-center space-x-3 mb-2">
+          <span class="text-xs font-bold text-[#162b3d] flex items-center min-w-[55px]">
+            <svg class="w-4 h-4 mr-1 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
             </svg>
             Zoom
           </span>
-          <input type="range" id="zoom-slider" min="0.2" max="3" step="0.01" value="1" class="w-full accent-blue-700 cursor-pointer">
-          <span id="zoom-level-text" class="text-xs font-bold text-slate-700 min-w-[40px] text-right">100%</span>
+          <input type="range" id="zoom-slider" min="0.2" max="3" step="0.01" value="1" class="w-full accent-[#b69861] cursor-pointer">
+          <span id="zoom-level-text" class="text-xs font-extrabold text-[#162b3d] min-w-[40px] text-right">100%</span>
         </div>
 
         <!-- Quick Rotate & Reset Buttons -->
         <div class="flex items-center justify-between pt-2 border-t border-slate-200">
           <div class="space-x-1.5">
             <button id="btn-rotate-left" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
-              <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5 mr-1 text-[#162b3d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
               Putar Kiri
             </button>
             <button id="btn-rotate-right" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
-              <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3.5 h-3.5 mr-1 text-[#162b3d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
               </svg>
               Putar Kanan
             </button>
           </div>
-          <button id="btn-reset-crop" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs text-rose-600 border-rose-200">
-            Reset Posisi
+          <button id="btn-reset-crop" class="flat-btn flat-btn-danger px-2.5 py-1 text-xs">
+            Reset
           </button>
         </div>
       </div>
 
       <!-- ACTION BUTTONS -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-200">
-        <button id="btn-reupload" class="flat-btn flat-btn-outline w-full sm:w-auto px-4 py-2.5 text-xs text-slate-700">
-          Ganti Foto
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200">
+        <button id="btn-reupload" class="flat-btn flat-btn-outline w-full sm:w-auto px-4 py-2 text-xs">
+          &larr; Ganti Foto
         </button>
         <button id="btn-crop-confirm" class="flat-btn flat-btn-primary w-full sm:w-auto px-6 py-2.5 text-sm">
           Lanjut ke Preview Video &rarr;
@@ -151,43 +201,43 @@
     </div>
 
     <!-- STEP 3: PREVIEW & DOWNLOAD SECTION (Hidden by default) -->
-    <div id="preview-section" class="hidden flat-card p-4 sm:p-6 bg-white">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+    <div id="preview-section" class="hidden flat-card p-3 sm:p-5 bg-white">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-2.5 mb-3">
         <div>
-          <h2 class="font-bold text-slate-900 text-base">Preview Hasil Video Twibbon</h2>
-          <p class="text-xs text-slate-500">Video intro akan diputar dulu, lalu dilanjutkan tampilan twibbon fotomu</p>
+          <h2 class="font-extrabold text-[#162b3d] text-sm sm:text-base">Hasil Video Twibbon</h2>
+          <p class="text-[11px] text-slate-500">Video intro diputar lebih dulu, lalu bersambung ke foto twibbonmu</p>
         </div>
-        <button id="btn-recrop" class="flat-btn flat-btn-outline px-3 py-1 text-xs">
-          Atur Posisi Foto
+        <button id="btn-recrop" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
+          Atur Ulang Foto
         </button>
       </div>
 
       <!-- CANVAS PREVIEW CONTAINER -->
-      <div class="canvas-preview-container mb-3">
+      <div class="canvas-preview-container mb-2.5">
         <canvas id="preview-canvas"></canvas>
       </div>
 
       <!-- PLAYER CONTROLS & TIMELINE -->
-      <div class="max-w-[480px] mx-auto mb-6">
+      <div class="max-w-[460px] mx-auto mb-4">
         <!-- Progress Bar -->
         <div class="flat-progress-bar mb-2">
           <div id="preview-progress-bar" class="flat-progress-fill"></div>
         </div>
 
-        <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
+        <div class="flex items-center justify-between text-xs text-slate-500 mb-2.5 font-medium">
           <span id="preview-time-display">0.0s / 0.0s</span>
-          <span class="text-slate-400">1080 x 1080 (HD)</span>
+          <span class="text-[#162b3d] font-bold">1080 x 1350 (Full HD)</span>
         </div>
 
         <div class="flex items-center justify-center space-x-2">
-          <button id="btn-play-pause" class="flat-btn flat-btn-outline px-4 py-2 text-xs">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="btn-play-pause" class="flat-btn flat-btn-outline px-4 py-1.5 text-xs">
+            <svg class="w-4 h-4 mr-1 text-[#162b3d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Pause
           </button>
-          <button id="btn-replay" class="flat-btn flat-btn-outline px-4 py-2 text-xs">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="btn-replay" class="flat-btn flat-btn-outline px-4 py-1.5 text-xs">
+            <svg class="w-4 h-4 mr-1 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             Ulangi
@@ -196,16 +246,16 @@
       </div>
 
       <!-- DOWNLOAD BUTTONS -->
-      <div class="max-w-[480px] mx-auto space-y-2.5 pt-4 border-t border-slate-200">
-        <button id="btn-download-video" class="flat-btn flat-btn-primary w-full py-3 text-sm shadow-none">
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="max-w-[460px] mx-auto space-y-2 pt-3 border-t border-slate-200">
+        <button id="btn-download-video" class="flat-btn flat-btn-primary w-full py-3 text-sm shadow-sm">
+          <svg class="w-5 h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
           Download Video Twibbon (MP4)
         </button>
 
-        <button id="btn-download-photo" class="flat-btn flat-btn-outline w-full py-2.5 text-xs text-slate-700">
-          <svg class="w-4 h-4 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button id="btn-download-photo" class="flat-btn flat-btn-accent w-full py-2.5 text-xs">
+          <svg class="w-4 h-4 mr-1.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           Download Foto Twibbon Saja (PNG)
@@ -215,62 +265,73 @@
 
   </main>
 
-  <!-- PROCESSING MODAL (Rendering Indicator) -->
-  <div id="processing-modal" class="hidden fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
-    <div class="bg-white flat-card max-w-sm w-full p-6 text-center shadow-xl">
-      <div class="w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-      <h3 class="text-base font-bold text-slate-900 mb-1">Sedang Membuat Video...</h3>
-      <p id="processing-status-text" class="text-xs text-slate-500 mb-4">Menyiapkan frame...</p>
+  <!-- PROCESSING MODAL (Themed Rendering Indicator) -->
+  <div id="processing-modal" class="hidden fixed inset-0 bg-[#162b3d]/85 z-50 flex items-center justify-center p-4">
+    <div class="bg-white flat-card max-w-sm w-full p-6 text-center shadow-2xl border-2 border-[#b69861]">
+      <div class="theme-spinner mx-auto mb-4"></div>
+      <h3 class="text-base font-extrabold text-[#162b3d] mb-1">Sedang Membuat Video...</h3>
+      <p id="processing-status-text" class="text-xs text-slate-500 mb-4">Menyatukan animasi sihir &amp; foto...</p>
 
       <div class="flat-progress-bar mb-2">
         <div id="processing-progress-fill" class="flat-progress-fill"></div>
       </div>
-      <div id="processing-percent-text" class="text-xs font-bold text-blue-700">0%</div>
-      <p class="text-[11px] text-slate-400 mt-3">Harap tunggu beberapa detik, proses berlangsung di browsermu.</p>
+      <div id="processing-percent-text" class="text-xs font-black text-[#162b3d]">0%</div>
+      <p class="text-[11px] text-slate-400 mt-3">Proses rendering instan di perangkatmu, tidak memakan kuota server.</p>
     </div>
   </div>
 
   <!-- SETTINGS DRAWER / MODAL -->
-  <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center p-4">
-    <div class="bg-white flat-card max-w-md w-full p-6 border border-slate-200">
-      <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-        <h3 class="font-bold text-slate-900 text-sm">Pengaturan Video &amp; Frame</h3>
+  <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
+    <div class="bg-white flat-card max-w-md w-full p-5 border-2 border-[#162b3d] shadow-xl">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-2.5 mb-3">
+        <h3 class="font-extrabold text-[#162b3d] text-sm">Pengaturan Video &amp; Frame</h3>
         <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 text-lg font-bold">
           &times;
         </button>
       </div>
 
-      <div class="space-y-4 text-xs">
+      <div class="space-y-3 text-xs">
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Durasi Twibbon Foto Diam (Detik):</label>
-          <input type="number" id="input-hold-duration" value="5" min="1" max="15" class="w-full border border-slate-300 p-2 rounded-sm text-slate-800">
-          <p class="text-[11px] text-slate-400 mt-1">Lama waktu foto twibbon ditampilkan setelah video intro selesai.</p>
+          <label class="block font-bold text-[#162b3d] mb-1">Durasi Foto Twibbon Diam (Detik):</label>
+          <input type="number" id="input-hold-duration" value="5" min="1" max="15" class="w-full border border-slate-300 p-2 rounded text-slate-800 focus:ring-1 focus:ring-[#b69861]">
+          <p class="text-[11px] text-slate-400 mt-1">Lama waktu foto twibbon ditampilkan setelah video animasi selesai.</p>
         </div>
 
-        <div class="pt-3 border-t border-slate-200">
-          <label class="block font-semibold text-slate-700 mb-1">Uji Coba Ganti Video Intro Langsung:</label>
-          <input type="file" id="custom-video-input" accept="video/mp4,video/webm" class="w-full text-slate-500 border border-slate-200 p-1.5 rounded-sm">
-          <p class="text-[11px] text-slate-400 mt-1">Atau simpan file permanen di <code class="bg-slate-100 px-1 py-0.5 font-mono">assets/intro.mp4</code></p>
+        <div class="pt-2 border-t border-slate-200">
+          <label class="block font-bold text-[#162b3d] mb-1">Ganti Video Intro:</label>
+          <input type="file" id="custom-video-input" accept="video/mp4,video/webm" class="w-full text-slate-500 border border-slate-200 p-1.5 rounded">
         </div>
 
-        <div class="pt-3 border-t border-slate-200">
-          <label class="block font-semibold text-slate-700 mb-1">Uji Coba Ganti Frame SVG / PNG:</label>
-          <input type="file" id="custom-frame-input" accept="image/svg+xml,image/png" class="w-full text-slate-500 border border-slate-200 p-1.5 rounded-sm">
-          <p class="text-[11px] text-slate-400 mt-1">Atau simpan file permanen di <code class="bg-slate-100 px-1 py-0.5 font-mono">assets/frame.svg</code></p>
+        <div class="pt-2 border-t border-slate-200">
+          <label class="block font-bold text-[#162b3d] mb-1">Ganti Frame SVG / PNG:</label>
+          <input type="file" id="custom-frame-input" accept="image/svg+xml,image/png" class="w-full text-slate-500 border border-slate-200 p-1.5 rounded">
         </div>
       </div>
 
-      <div class="mt-6 text-right">
-        <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="flat-btn flat-btn-primary px-4 py-2 text-xs">
+      <div class="mt-5 text-right">
+        <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="flat-btn flat-btn-primary px-4 py-1.5 text-xs">
           Tutup
         </button>
       </div>
     </div>
   </div>
 
-  <!-- FOOTER -->
-  <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">
-    <p>Official Twibbon Video Generator &copy; 2026</p>
+  <!-- APP FOOTER -->
+  <footer class="bg-white border-t border-slate-200 py-3 px-4 text-center text-xs text-slate-600">
+    <div class="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p class="font-semibold text-slate-700">
+        PKKMB SADAJIWA IDE LPKIA &copy; 2026
+      </p>
+
+      <a href="https://zysrnh.my.id/" target="_blank" rel="noopener noreferrer" 
+         class="inline-flex items-center space-x-1.5 text-slate-600 hover:text-[#162b3d] font-bold transition-colors">
+        <span>Made with ❤️ by</span>
+        <div class="w-4 h-4 bg-white rounded-full flex items-center justify-center overflow-hidden border border-slate-200">
+          <img src="zyrsnh.png" alt="zysrnh" class="w-full h-full object-contain">
+        </div>
+        <span class="underline decoration-[#b69861] decoration-2">zysrnh</span>
+      </a>
+    </div>
   </footer>
 
   <!-- App Script -->

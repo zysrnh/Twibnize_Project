@@ -392,6 +392,18 @@ function bindEvents() {
   }
 }
 
+function setStep(step) {
+  const p1 = document.getElementById('step-1-pill');
+  const p2 = document.getElementById('step-2-pill');
+  const p3 = document.getElementById('step-3-pill');
+
+  if (p1 && p2 && p3) {
+    p1.className = step === 1 ? 'step-item active' : 'step-item completed';
+    p2.className = step === 2 ? 'step-item active' : (step > 2 ? 'step-item completed' : 'step-item');
+    p3.className = step === 3 ? 'step-item active' : 'step-item';
+  }
+}
+
 /**
  * Handle Loaded User Image
  */
@@ -401,7 +413,7 @@ function handleUserFile(file) {
       icon: 'error',
       title: 'Format Tidak Sesuai',
       text: 'Harap upload file gambar (JPG, PNG, WEBP).',
-      confirmButtonColor: '#1e40af'
+      confirmButtonColor: '#162b3d'
     });
     return;
   }
@@ -418,6 +430,7 @@ function handleUserFile(file) {
  * Initialize Cropper
  */
 function openCropper(imageSrc) {
+  setStep(2);
   el.uploadDropzone.classList.add('hidden');
   el.previewSection.classList.add('hidden');
   el.cropperSection.classList.remove('hidden');
@@ -469,6 +482,8 @@ function openCropper(imageSrc) {
 function confirmCropAndProceed() {
   if (!state.cropper) return;
 
+  setStep(3);
+
   // Dapatkan hasil crop dengan resolusi tajam
   state.croppedCanvas = state.cropper.getCroppedCanvas({
     width: state.canvasSize.width,
@@ -493,6 +508,7 @@ function confirmCropAndProceed() {
  * Back to Cropper from Preview
  */
 function backToCropper() {
+  setStep(2);
   stopPreviewPlayer();
   el.previewSection.classList.add('hidden');
   el.cropperSection.classList.remove('hidden');
@@ -502,6 +518,7 @@ function backToCropper() {
  * Reset all to upload screen
  */
 function resetToUpload() {
+  setStep(1);
   stopPreviewPlayer();
   if (state.cropper) state.cropper.destroy();
   el.fileInput.value = '';
