@@ -1,11 +1,12 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v6.0 - Patient Offline Rendering (Anti Patah-Patah Mobile)
+ * v7.0 - Server-Side FFmpeg Engine (Ultra Smooth 30fps HD)
  * 
- * Strategi BARU:
- * - WebCodecs (Android Chrome): Frame-by-frame SABAR + VideoEncoder → MP4 sempurna
- *   Bukan real-time, jadi TIDAK ADA frame drop. Mau 2 menit juga output tetap 24fps smooth.
- * - MediaRecorder fallback (iOS/browser lama): Resolusi kecil 540x675 agar HP kuat render real-time
+ * Strategi:
+ * - UTAMA: Kirim foto composite ke backend PHP (/api/render.php).
+ *   FFmpeg di server merender video 1080x1350 @ 30fps dengan crossfade 0.6s.
+ *   Hasil 100% mulus tanpa drop frame di semua HP (iOS & Android).
+ * - FALLBACK: WebCodecs patient offline rendering / MediaRecorder jika server offline.
  */
 
 // Global App State
@@ -575,21 +576,8 @@ function startVideoExport() {
   el.processingModal.classList.remove('hidden');
   updateExportProgress(0, 'Menyiapkan mesin render...');
 
-  // Deteksi WebCodecs support
-  var hasWebCodecs = (typeof VideoEncoder !== 'undefined') &&
-                     (typeof VideoFrame !== 'undefined') &&
-                     (typeof Mp4Muxer !== 'undefined');
-
-  console.log('[Export] WebCodecs: ' + hasWebCodecs);
-
-  var exportPromise;
-  if (hasWebCodecs) {
-    exportPromise = exportPatientWebCodecs();
-  } else {
-    exportPromise = exportLowResMediaRecorder();
-  }
-
-  exportPromise.catch(function(err) {
+  // Prioritaskan Server-Side Render dengan FFmpeg
+  exportServerSideFfmpeg().catch(function(err) {
     console.error('Export Error:', err);
     el.processingModal.classList.add('hidden');
     state.isRendering = false;
@@ -601,6 +589,119 @@ function startVideoExport() {
       confirmButtonColor: '#162b3d'
     });
   });
+}
+
+/* ----------------------------------------------------------
+ * UTAMA: Server-Side FFmpeg Render (PHP Backend)
+ * Kualitas HD 1080x1350 @ 30fps TANPA PATAH-PATAH di HP
+ * ---------------------------------------------------------- */
+function exportServerSideFfmpeg() {
+  return new Promise(function(resolve, reject) {
+    try {
+      updateExportProgress(5, 'Menyiapkan gambar twibbon...');
+
+      // Render canvas komposit 1080x1350
+      var exportCanvas = document.createElement('canvas');
+      exportCanvas.width = state.canvasSize.width;
+      exportCanvas.height = state.canvasSize.height;
+      var ctx = exportCanvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(state.croppedCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
+      if (state.isFrameLoaded) {
+        ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, exportCanvas.width, exportCanvas.height);
+      }
+
+      exportCanvas.toBlob(async function(blob) {
+        if (!blob) {
+          console.warn('[Server Render] Gagal membuat blob gambar, beralih ke browser render.');
+          return fallbackToClientRender(resolve, reject);
+        }
+
+        updateExportProgress(15, 'Mengunggah gambar ke server...');
+
+        var formData = new FormData();
+        formData.append('image', blob, 'twibbon_composite.png');
+        formData.append('holdDuration', state.holdPhotoDuration || 5);
+
+        // Progress timer simulasi saat server merender video
+        var currentPercent = 15;
+        var progressTimer = setInterval(function() {
+          if (currentPercent < 85) {
+            currentPercent += Math.floor(Math.random() * 6) + 3;
+            if (currentPercent > 85) currentPercent = 85;
+            updateExportProgress(currentPercent, 'Server sedang merender video HD (30fps)...');
+          }
+        }, 500);
+
+        try {
+          var response = await fetch('api/render.php', {
+            method: 'POST',
+            body: formData
+          });
+
+          clearInterval(progressTimer);
+
+          // Jika server mengembalikan selain 200 OK
+          if (!response.ok) {
+            var errDetail = 'Server HTTP error ' + response.status;
+            try {
+              var errJson = await response.json();
+              if (errJson && errJson.message) errDetail = errJson.message;
+            } catch(e) {}
+            console.warn('[Server Render] Error: ' + errDetail + ' -> Fallback ke client');
+            return fallbackToClientRender(resolve, reject);
+          }
+
+          // Pastikan response adalah video
+          var contentType = response.headers.get('content-type') || '';
+          if (contentType.indexOf('video') === -1 && contentType.indexOf('octet-stream') === -1) {
+            console.warn('[Server Render] Response bukan video, fallback ke client');
+            return fallbackToClientRender(resolve, reject);
+          }
+
+          updateExportProgress(92, 'Mengunduh video MP4...');
+
+          var videoBlob = await response.blob();
+          var filename = 'Twibbon_PKKMB_LPKIA_' + Date.now() + '.mp4';
+          downloadBlob(videoBlob, filename);
+
+          updateExportProgress(100, 'Selesai!');
+
+          setTimeout(function() {
+            el.processingModal.classList.add('hidden');
+            state.isRendering = false;
+            startPreviewPlayer();
+            Swal.fire({
+              icon: 'success',
+              title: 'Video Berhasil Dibuat!',
+              html: '<b>' + filename + '</b><br><small>1080x1350 • 30fps (Kualitas Server HD)</small>',
+              confirmButtonColor: '#162b3d'
+            });
+            resolve();
+          }, 400);
+
+        } catch (netErr) {
+          clearInterval(progressTimer);
+          console.warn('[Server Render] Koneksi server gagal: ' + netErr.message + ' -> Fallback ke client');
+          return fallbackToClientRender(resolve, reject);
+        }
+      }, 'image/png');
+
+    } catch (e) {
+      fallbackToClientRender(resolve, reject);
+    }
+  });
+}
+
+function fallbackToClientRender(resolve, reject) {
+  updateExportProgress(25, 'Beralih ke render browser client...');
+  var hasWebCodecs = (typeof VideoEncoder !== 'undefined') &&
+                     (typeof VideoFrame !== 'undefined') &&
+                     (typeof Mp4Muxer !== 'undefined');
+
+  var clientPromise = hasWebCodecs ? exportPatientWebCodecs() : exportLowResMediaRecorder();
+  clientPromise.then(resolve).catch(reject);
 }
 
 /* ----------------------------------------------------------
