@@ -121,38 +121,22 @@ function loadFirstAvailableImage(candidates, index) {
     state.frameImg.src = candidates[index];
     state.isFrameLoaded = true;
     
-    // Auto-detect aspect ratio dari frame SVG/PNG
-    const naturalW = testImg.naturalWidth || testImg.width || 1080;
-    const naturalH = testImg.naturalHeight || testImg.height || 1080;
-    state.aspectRatio = naturalW / naturalH;
-    
-    // Set resolusi render HD optimal sesuai rasio
-    if (Math.abs(state.aspectRatio - 1) < 0.05) {
-      // 1:1 Square
-      state.canvasSize = { width: 1080, height: 1080 };
-    } else if (state.aspectRatio < 0.9) {
-      // Portrait / 4:5 / 9:16 (Story / Feed Vertikal)
-      const targetW = 1080;
-      const targetH = Math.round(targetW / state.aspectRatio);
-      state.canvasSize = { width: targetW, height: targetH };
-    } else {
-      // Landscape
-      const targetH = 1080;
-      const targetW = Math.round(targetH * state.aspectRatio);
-      state.canvasSize = { width: targetW, height: targetH };
-    }
+    // KUNCI RESOLUSI TETAP KE 1080 x 1350 (4:5 Murni Portrait Instagram/WA)
+    // Hindari glitch browser yang membaca SVG sebagai 300x150 landscape
+    state.aspectRatio = 1080 / 1350;
+    state.canvasSize = { width: 1080, height: 1350 };
     
     // Update dimensi canvas preview & render
     if (state.previewCanvas) {
-      state.previewCanvas.width = state.canvasSize.width;
-      state.previewCanvas.height = state.canvasSize.height;
+      state.previewCanvas.width = 1080;
+      state.previewCanvas.height = 1350;
     }
     if (state.renderCanvas) {
-      state.renderCanvas.width = state.canvasSize.width;
-      state.renderCanvas.height = state.canvasSize.height;
+      state.renderCanvas.width = 1080;
+      state.renderCanvas.height = 1350;
     }
 
-    // Auto Chroma Key (Hapus Green Screen Otomatis)
+    // Auto Chroma Key (Hapus Green Screen Otomatis dengan resolusi 1080x1350)
     state.processedFrameCanvas = applyChromaKey(testImg);
     const transparentFrameDataUrl = state.processedFrameCanvas.toDataURL();
 
@@ -160,7 +144,7 @@ function loadFirstAvailableImage(candidates, index) {
       el.cropperFrameOverlay.src = transparentFrameDataUrl;
     }
     
-    console.log(`Menggunakan frame twibbon: ${candidates[index]} (${state.canvasSize.width}x${state.canvasSize.height}, rasio: ${state.aspectRatio.toFixed(2)}) dengan Auto Green-Screen Removal.`);
+    console.log(`Menggunakan frame twibbon: ${candidates[index]} (TERKUNCI 1080x1350 - Rasio 4:5 Murni)`);
   };
   testImg.onerror = () => {
     loadFirstAvailableImage(candidates, index + 1);
@@ -168,17 +152,17 @@ function loadFirstAvailableImage(candidates, index) {
 }
 
 /**
- * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon)
+ * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon pada 1080x1350)
  */
 function applyChromaKey(sourceImage) {
   const c = document.createElement('canvas');
-  c.width = sourceImage.naturalWidth || sourceImage.width || 1080;
-  c.height = sourceImage.naturalHeight || sourceImage.height || 1080;
+  c.width = 1080;
+  c.height = 1350;
   const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(sourceImage, 0, 0, c.width, c.height);
+  ctx.drawImage(sourceImage, 0, 0, 1080, 1350);
 
   try {
-    const imgData = ctx.getImageData(0, 0, c.width, c.height);
+    const imgData = ctx.getImageData(0, 0, 1080, 1350);
     const data = imgData.data;
 
     for (let i = 0; i < data.length; i += 4) {
@@ -187,7 +171,6 @@ function applyChromaKey(sourceImage) {
       const b = data[i + 2];
 
       // Deteksi warna hijau green-screen:
-      // Green dominan dibanding Red dan Blue
       const maxRB = Math.max(r, b);
       if (g > 70 && g > maxRB * 1.25) {
         const diff = g - maxRB;
