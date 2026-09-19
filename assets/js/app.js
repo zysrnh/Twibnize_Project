@@ -1,10 +1,11 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v5.0 - Natural Playback Recording (Zero Frame-Seeking)
+ * v6.0 - Patient Offline Rendering (Anti Patah-Patah Mobile)
  * 
- * Strategi: Video diputar NATURAL (bukan seek per-frame), lalu canvas 
- * direkam pakai MediaRecorder. HP handle smooth karena hardware decoder
- * cuma putar video biasa — TANPA seeking sama sekali.
+ * Strategi BARU:
+ * - WebCodecs (Android Chrome): Frame-by-frame SABAR + VideoEncoder → MP4 sempurna
+ *   Bukan real-time, jadi TIDAK ADA frame drop. Mau 2 menit juga output tetap 24fps smooth.
+ * - MediaRecorder fallback (iOS/browser lama): Resolusi kecil 540x675 agar HP kuat render real-time
  */
 
 // Global App State
@@ -55,13 +56,11 @@ const el = {
   btnDownloadVideo: document.getElementById('btn-download-video'),
   btnDownloadPhoto: document.getElementById('btn-download-photo'),
 
-  // Processing & Modal
   processingModal: document.getElementById('processing-modal'),
   processingProgressFill: document.getElementById('processing-progress-fill'),
   processingStatusText: document.getElementById('processing-status-text'),
   processingPercentText: document.getElementById('processing-percent-text'),
 
-  // Settings & Custom Asset Loaders
   customVideoInput: document.getElementById('custom-video-input'),
   customFrameInput: document.getElementById('custom-frame-input'),
   inputHoldDuration: document.getElementById('input-hold-duration'),
@@ -69,15 +68,12 @@ const el = {
 };
 
 // Initialize Application
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
   initCanvases();
   loadDefaultAssets();
   bindEvents();
 });
 
-/**
- * Setup Canvases (Preview Canvas & High-Res Render Canvas)
- */
 function initCanvases() {
   state.previewCanvas = el.previewCanvas;
   state.previewCtx = state.previewCanvas.getContext('2d');
@@ -90,14 +86,9 @@ function initCanvases() {
   state.renderCanvas.height = state.canvasSize.height;
 }
 
-/**
- * Load Initial Assets (SVG Frame and Intro Video)
- */
 function loadDefaultAssets() {
-  // 1. Load twibon.svg from assets/images/
   state.frameImg.crossOrigin = 'anonymous';
-  
-  const frameCandidates = [
+  var frameCandidates = [
     'assets/images/twibon.svg',
     'assets/twibon.svg',
     'twibon.svg',
@@ -106,13 +97,11 @@ function loadDefaultAssets() {
   ];
   loadFirstAvailableImage(frameCandidates, 0);
 
-  // 2. Load Framenaur.mp4 from assets/videos/
   state.introVideo.crossOrigin = 'anonymous';
   state.introVideo.playsInline = true;
-  state.introVideo.muted = true; // Muted for seamless autoplay on mobile
+  state.introVideo.muted = true;
   state.introVideo.preload = 'auto';
-  
-  const videoCandidates = [
+  var videoCandidates = [
     'assets/videos/Framenaur.mp4',
     'assets/Framenaur.mp4',
     'Framenaur.mp4',
@@ -126,17 +115,14 @@ function loadFirstAvailableImage(candidates, index) {
     console.warn('File frame twibbon tidak ditemukan.');
     return;
   }
-  
-  const testImg = new Image();
+  var testImg = new Image();
   testImg.crossOrigin = 'anonymous';
   testImg.src = candidates[index];
-  testImg.onload = () => {
+  testImg.onload = function() {
     state.frameImg.src = candidates[index];
     state.isFrameLoaded = true;
-    
     state.aspectRatio = 1080 / 1350;
     state.canvasSize = { width: 1080, height: 1350 };
-    
     if (state.previewCanvas) {
       state.previewCanvas.width = 1080;
       state.previewCanvas.height = 1350;
@@ -145,58 +131,43 @@ function loadFirstAvailableImage(candidates, index) {
       state.renderCanvas.width = 1080;
       state.renderCanvas.height = 1350;
     }
-
-    // Auto Chroma Key (Hapus Green Screen Otomatis)
     state.processedFrameCanvas = applyChromaKey(testImg);
-    const transparentFrameDataUrl = state.processedFrameCanvas.toDataURL();
-
+    var transparentFrameDataUrl = state.processedFrameCanvas.toDataURL();
     if (el.cropperFrameOverlay) {
       el.cropperFrameOverlay.src = transparentFrameDataUrl;
     }
-    
-    console.log(`Menggunakan frame twibbon: ${candidates[index]} (1080x1350 - 4:5)`);
+    console.log('Menggunakan frame twibbon: ' + candidates[index] + ' (1080x1350 - 4:5)');
   };
-  testImg.onerror = () => {
+  testImg.onerror = function() {
     loadFirstAvailableImage(candidates, index + 1);
   };
 }
 
-/**
- * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon pada 1080x1350)
- */
 function applyChromaKey(sourceImage) {
-  const c = document.createElement('canvas');
+  var c = document.createElement('canvas');
   c.width = 1080;
   c.height = 1350;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
+  var ctx = c.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(sourceImage, 0, 0, 1080, 1350);
-
   try {
-    const imgData = ctx.getImageData(0, 0, 1080, 1350);
-    const data = imgData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      // Deteksi warna hijau green-screen
-      const maxRB = Math.max(r, b);
+    var imgData = ctx.getImageData(0, 0, 1080, 1350);
+    var data = imgData.data;
+    for (var i = 0; i < data.length; i += 4) {
+      var r = data[i], g = data[i + 1], b = data[i + 2];
+      var maxRB = Math.max(r, b);
       if (g > 70 && g > maxRB * 1.25) {
-        const diff = g - maxRB;
+        var diff = g - maxRB;
         if (diff > 35) {
-          data[i + 3] = 0; // Transparan 100%
+          data[i + 3] = 0;
         } else {
           data[i + 3] = Math.round(255 * (1 - (diff / 35)));
         }
       }
     }
-
     ctx.putImageData(imgData, 0, 0);
   } catch (e) {
     console.warn('Gagal membaca pixel untuk chroma key:', e);
   }
-
   return c;
 }
 
@@ -205,159 +176,122 @@ function loadFirstAvailableVideo(candidates, index) {
     console.warn('Video intro tidak ditemukan pada path default.');
     return;
   }
-
-  const vSrc = candidates[index];
-  const testVid = document.createElement('video');
+  var vSrc = candidates[index];
+  var testVid = document.createElement('video');
   testVid.crossOrigin = 'anonymous';
   testVid.playsInline = true;
   testVid.muted = true;
   testVid.src = vSrc;
-
-  testVid.onloadedmetadata = () => {
+  testVid.onloadedmetadata = function() {
     state.introVideo.src = vSrc;
     state.isVideoLoaded = true;
     state.hasCustomVideo = true;
     state.totalVideoDuration = testVid.duration || 10;
-    updateVideoStatusBadge(true, `Video Siap (${vSrc} - ${testVid.duration.toFixed(1)}s)`);
-    console.log(`Menggunakan video: ${vSrc} (${testVid.duration.toFixed(1)}s)`);
+    updateVideoStatusBadge(true, 'Video Siap (' + vSrc + ' - ' + testVid.duration.toFixed(1) + 's)');
+    console.log('Menggunakan video: ' + vSrc + ' (' + testVid.duration.toFixed(1) + 's)');
   };
-
-  testVid.onerror = () => {
+  testVid.onerror = function() {
     loadFirstAvailableVideo(candidates, index + 1);
   };
 }
 
-/**
- * Update video badge indicator
- */
 function updateVideoStatusBadge(isCustom, text) {
   if (!el.videoStatusBadge) return;
   if (isCustom) {
     el.videoStatusBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300';
-    el.videoStatusBadge.innerHTML = `<span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full"></span> ${text}`;
+    el.videoStatusBadge.innerHTML = '<span class="w-2 h-2 mr-1.5 bg-emerald-500 rounded-full"></span> ' + text;
   } else {
     el.videoStatusBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300';
-    el.videoStatusBadge.innerHTML = `<span class="w-2 h-2 mr-1.5 bg-amber-500 rounded-full"></span> ${text}`;
+    el.videoStatusBadge.innerHTML = '<span class="w-2 h-2 mr-1.5 bg-amber-500 rounded-full"></span> ' + text;
   }
 }
 
-/**
- * Bind All Event Handlers
- */
 function bindEvents() {
-  // File Upload Handlers
-  el.fileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleUserFile(e.target.files[0]);
-    }
+  el.fileInput.addEventListener('change', function(e) {
+    if (e.target.files && e.target.files[0]) handleUserFile(e.target.files[0]);
   });
-
-  // Drag & Drop
-  el.uploadDropzone.addEventListener('dragover', (e) => {
+  el.uploadDropzone.addEventListener('dragover', function(e) {
     e.preventDefault();
     el.uploadDropzone.classList.add('border-[#b69861]', 'bg-amber-50/20');
   });
-  el.uploadDropzone.addEventListener('dragleave', () => {
+  el.uploadDropzone.addEventListener('dragleave', function() {
     el.uploadDropzone.classList.remove('border-[#b69861]', 'bg-amber-50/20');
   });
-  el.uploadDropzone.addEventListener('drop', (e) => {
+  el.uploadDropzone.addEventListener('drop', function(e) {
     e.preventDefault();
     el.uploadDropzone.classList.remove('border-[#b69861]', 'bg-amber-50/20');
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleUserFile(e.dataTransfer.files[0]);
-    }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleUserFile(e.dataTransfer.files[0]);
   });
-
-  // Cropper Controls
   if (el.zoomSlider) {
-    el.zoomSlider.addEventListener('input', (e) => {
+    el.zoomSlider.addEventListener('input', function(e) {
       if (state.cropper) {
-        const val = parseFloat(e.target.value);
+        var val = parseFloat(e.target.value);
         state.cropper.zoomTo(val);
-        if (el.zoomLevelText) el.zoomLevelText.textContent = `${Math.round(val * 100)}%`;
+        if (el.zoomLevelText) el.zoomLevelText.textContent = Math.round(val * 100) + '%';
       }
     });
   }
-
-  el.btnRotateLeft.addEventListener('click', () => state.cropper && state.cropper.rotate(-90));
-  el.btnRotateRight.addEventListener('click', () => state.cropper && state.cropper.rotate(90));
-  el.btnResetCrop.addEventListener('click', () => {
+  el.btnRotateLeft.addEventListener('click', function() { if (state.cropper) state.cropper.rotate(-90); });
+  el.btnRotateRight.addEventListener('click', function() { if (state.cropper) state.cropper.rotate(90); });
+  el.btnResetCrop.addEventListener('click', function() {
     if (state.cropper) {
       state.cropper.reset();
       if (el.zoomSlider) el.zoomSlider.value = 1;
       if (el.zoomLevelText) el.zoomLevelText.textContent = '100%';
     }
   });
-
   if (el.toggleFrameGuide) {
-    el.toggleFrameGuide.addEventListener('change', (e) => {
+    el.toggleFrameGuide.addEventListener('change', function(e) {
       el.cropperFrameOverlay.style.display = e.target.checked ? 'block' : 'none';
     });
   }
-
   el.btnCropConfirm.addEventListener('click', confirmCropAndProceed);
   el.btnReupload.addEventListener('click', resetToUpload);
   el.btnRecrop.addEventListener('click', backToCropper);
-
-  // Preview & Download Controls
   el.btnPlayPause.addEventListener('click', togglePreviewPlayback);
   el.btnReplay.addEventListener('click', restartPreviewPlayback);
   el.btnDownloadVideo.addEventListener('click', startVideoExport);
   el.btnDownloadPhoto.addEventListener('click', exportStaticPhoto);
 
-  // Settings: Custom Video / SVG file pickers
   if (el.customVideoInput) {
-    el.customVideoInput.addEventListener('change', (e) => {
+    el.customVideoInput.addEventListener('change', function(e) {
       if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        const url = URL.createObjectURL(file);
+        var file = e.target.files[0];
+        var url = URL.createObjectURL(file);
         state.introVideo.src = url;
         state.introVideo.load();
         state.hasCustomVideo = true;
-        updateVideoStatusBadge(true, `Video Kustom: ${file.name}`);
-        Swal.fire({
-          icon: 'success',
-          title: 'Video Intro Diganti',
-          text: `Menggunakan video: ${file.name}`,
-          confirmButtonColor: '#162b3d'
-        });
+        updateVideoStatusBadge(true, 'Video Kustom: ' + file.name);
+        Swal.fire({ icon: 'success', title: 'Video Intro Diganti', text: 'Menggunakan video: ' + file.name, confirmButtonColor: '#162b3d' });
       }
     });
   }
-
   if (el.customFrameInput) {
-    el.customFrameInput.addEventListener('change', (e) => {
+    el.customFrameInput.addEventListener('change', function(e) {
       if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        const url = URL.createObjectURL(file);
+        var file = e.target.files[0];
+        var url = URL.createObjectURL(file);
         state.frameImg.src = url;
-        state.frameImg.onload = () => {
+        state.frameImg.onload = function() {
           state.processedFrameCanvas = applyChromaKey(state.frameImg);
-          const transparentUrl = state.processedFrameCanvas.toDataURL();
+          var transparentUrl = state.processedFrameCanvas.toDataURL();
           if (el.cropperFrameOverlay) el.cropperFrameOverlay.src = transparentUrl;
-          Swal.fire({
-            icon: 'success',
-            title: 'Frame Twibbon Diganti',
-            text: `Menggunakan frame: ${file.name}`,
-            confirmButtonColor: '#162b3d'
-          });
+          Swal.fire({ icon: 'success', title: 'Frame Twibbon Diganti', text: 'Menggunakan frame: ' + file.name, confirmButtonColor: '#162b3d' });
         };
       }
     });
   }
-
   if (el.inputHoldDuration) {
-    el.inputHoldDuration.addEventListener('input', (e) => {
+    el.inputHoldDuration.addEventListener('input', function(e) {
       state.holdPhotoDuration = parseFloat(e.target.value) || 5;
     });
   }
 }
 
 function setStep(step) {
-  const p1 = document.getElementById('step-1-pill');
-  const p2 = document.getElementById('step-2-pill');
-  const p3 = document.getElementById('step-3-pill');
-
+  var p1 = document.getElementById('step-1-pill');
+  var p2 = document.getElementById('step-2-pill');
+  var p3 = document.getElementById('step-3-pill');
   if (p1 && p2 && p3) {
     p1.className = step === 1 ? 'step-item active' : 'step-item completed';
     p2.className = step === 2 ? 'step-item active' : (step > 2 ? 'step-item completed' : 'step-item');
@@ -365,48 +299,30 @@ function setStep(step) {
   }
 }
 
-/**
- * Handle Loaded User Image
- */
 function handleUserFile(file) {
   if (!file.type.startsWith('image/')) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Format Tidak Sesuai',
-      text: 'Harap upload file gambar (JPG, PNG, WEBP).',
-      confirmButtonColor: '#162b3d'
-    });
+    Swal.fire({ icon: 'error', title: 'Format Tidak Sesuai', text: 'Harap upload file gambar (JPG, PNG, WEBP).', confirmButtonColor: '#162b3d' });
     return;
   }
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
+  var reader = new FileReader();
+  reader.onload = function(e) {
     state.rawImageSrc = e.target.result;
     openCropper(state.rawImageSrc);
   };
   reader.readAsDataURL(file);
 }
 
-/**
- * Initialize Cropper
- */
 function openCropper(imageSrc) {
   setStep(2);
   el.uploadDropzone.classList.add('hidden');
   el.previewSection.classList.add('hidden');
   el.cropperSection.classList.remove('hidden');
-
   el.cropperImage.src = imageSrc;
-
-  if (state.cropper) {
-    state.cropper.destroy();
-  }
-
-  const cropperContainer = el.cropperImage.parentElement;
+  if (state.cropper) state.cropper.destroy();
+  var cropperContainer = el.cropperImage.parentElement;
   if (cropperContainer) {
-    cropperContainer.style.aspectRatio = `${state.canvasSize.width} / ${state.canvasSize.height}`;
+    cropperContainer.style.aspectRatio = state.canvasSize.width + ' / ' + state.canvasSize.height;
   }
-
   state.cropper = new Cropper(el.cropperImage, {
     aspectRatio: 1080 / 1350,
     viewMode: 0,
@@ -422,48 +338,37 @@ function openCropper(imageSrc) {
     zoomOnTouch: true,
     zoomOnWheel: true,
     wheelZoomRatio: 0.05,
-    ready() {
+    ready: function() {
       if (el.zoomSlider) el.zoomSlider.value = 1;
       if (el.zoomLevelText) el.zoomLevelText.textContent = '100%';
     },
-    zoom(e) {
+    zoom: function(e) {
       if (el.zoomSlider && e.detail && e.detail.ratio) {
-        const ratio = Math.min(3, Math.max(0.2, e.detail.ratio));
+        var ratio = Math.min(3, Math.max(0.2, e.detail.ratio));
         el.zoomSlider.value = ratio;
-        if (el.zoomLevelText) el.zoomLevelText.textContent = `${Math.round(ratio * 100)}%`;
+        if (el.zoomLevelText) el.zoomLevelText.textContent = Math.round(ratio * 100) + '%';
       }
     }
   });
 }
 
-/**
- * Confirm Crop and Switch to Preview
- */
 function confirmCropAndProceed() {
   if (!state.cropper) return;
-
   setStep(3);
-
   state.croppedCanvas = state.cropper.getCroppedCanvas({
     width: state.canvasSize.width,
     height: state.canvasSize.height,
     imageSmoothingEnabled: true,
     imageSmoothingQuality: 'high'
   });
-
   if (state.previewCanvas && state.previewCanvas.parentElement) {
-    state.previewCanvas.parentElement.style.aspectRatio = `${state.canvasSize.width} / ${state.canvasSize.height}`;
+    state.previewCanvas.parentElement.style.aspectRatio = state.canvasSize.width + ' / ' + state.canvasSize.height;
   }
-
   el.cropperSection.classList.add('hidden');
   el.previewSection.classList.remove('hidden');
-
   startPreviewPlayer();
 }
 
-/**
- * Back to Cropper from Preview
- */
 function backToCropper() {
   setStep(2);
   stopPreviewPlayer();
@@ -471,9 +376,6 @@ function backToCropper() {
   el.cropperSection.classList.remove('hidden');
 }
 
-/**
- * Reset all to upload screen
- */
 function resetToUpload() {
   setStep(1);
   stopPreviewPlayer();
@@ -484,13 +386,11 @@ function resetToUpload() {
   el.uploadDropzone.classList.remove('hidden');
 }
 
-/**
- * ----------------------------------------------------
+/* ============================================================
  * PREVIEW & CANVAS COMPOSITOR ENGINE
- * ----------------------------------------------------
- */
+ * ============================================================ */
 
-let previewState = {
+var previewState = {
   isPlaying: false,
   currentTime: 0,
   introDuration: 10,
@@ -500,42 +400,31 @@ let previewState = {
 
 function startPreviewPlayer() {
   stopPreviewPlayer();
-
-  const introDuration = state.introVideo.duration && !isNaN(state.introVideo.duration)
-    ? state.introVideo.duration
-    : 10.0;
-
+  var introDuration = state.introVideo.duration && !isNaN(state.introVideo.duration) ? state.introVideo.duration : 10.0;
   previewState.introDuration = introDuration;
   previewState.totalDuration = introDuration + state.holdPhotoDuration;
   previewState.currentTime = 0;
   previewState.isPlaying = true;
   previewState.startTime = performance.now();
-
   state.introVideo.currentTime = 0;
-  state.introVideo.play().catch(e => console.log('Autoplay muted preview'));
-
+  state.introVideo.play().catch(function() {});
   updatePlayButtonIcon(true);
   runPreviewLoop();
 }
 
 function runPreviewLoop() {
   if (!previewState.isPlaying) return;
-
-  const now = performance.now();
-  const elapsed = (now - previewState.startTime) / 1000;
+  var now = performance.now();
+  var elapsed = (now - previewState.startTime) / 1000;
   previewState.currentTime = elapsed;
-
   if (previewState.currentTime >= previewState.totalDuration) {
-    // Selesai -> Loop kembali
     previewState.currentTime = 0;
     previewState.startTime = performance.now();
     state.introVideo.currentTime = 0;
-    state.introVideo.play().catch(() => {});
+    state.introVideo.play().catch(function() {});
   }
-
   renderFrameToCanvas(state.previewCtx, previewState.currentTime, previewState.introDuration);
   updatePreviewUI();
-
   state.animFrameId = requestAnimationFrame(runPreviewLoop);
 }
 
@@ -549,16 +438,14 @@ function togglePreviewPlayback() {
     previewState.startTime = performance.now() - (previewState.currentTime * 1000);
     state.introVideo.currentTime = Math.min(previewState.currentTime, state.introVideo.duration || 0);
     if (previewState.currentTime < previewState.introDuration) {
-      state.introVideo.play().catch(() => {});
+      state.introVideo.play().catch(function() {});
     }
     updatePlayButtonIcon(true);
     runPreviewLoop();
   }
 }
 
-function restartPreviewPlayback() {
-  startPreviewPlayer();
-}
+function restartPreviewPlayback() { startPreviewPlayer(); }
 
 function stopPreviewPlayer() {
   previewState.isPlaying = false;
@@ -568,141 +455,141 @@ function stopPreviewPlayer() {
 
 function updatePlayButtonIcon(isPlaying) {
   if (!el.btnPlayPause) return;
-  if (isPlaying) {
-    el.btnPlayPause.innerHTML = `
-      <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      Pause
-    `;
-  } else {
-    el.btnPlayPause.innerHTML = `
-      <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      Play
-    `;
-  }
+  el.btnPlayPause.innerHTML = isPlaying
+    ? '<svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Pause'
+    : '<svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Play';
 }
 
 function updatePreviewUI() {
-  const current = previewState.currentTime.toFixed(1);
-  const total = previewState.totalDuration.toFixed(1);
-  if (el.previewTimeDisplay) {
-    el.previewTimeDisplay.textContent = `${current}s / ${total}s`;
-  }
+  var current = previewState.currentTime.toFixed(1);
+  var total = previewState.totalDuration.toFixed(1);
+  if (el.previewTimeDisplay) el.previewTimeDisplay.textContent = current + 's / ' + total + 's';
   if (el.previewProgressBar) {
-    const percent = Math.min(100, (previewState.currentTime / previewState.totalDuration) * 100);
-    el.previewProgressBar.style.width = `${percent}%`;
+    var percent = Math.min(100, (previewState.currentTime / previewState.totalDuration) * 100);
+    el.previewProgressBar.style.width = percent + '%';
   }
 }
 
-/**
- * Helper: Draw video / image with object-fit: cover on target canvas
- */
 function drawCoverMedia(ctx, media, targetW, targetH) {
-  const srcW = media.videoWidth || media.naturalWidth || media.width || targetW;
-  const srcH = media.videoHeight || media.naturalHeight || media.height || targetH;
-  const srcRatio = srcW / srcH;
-  const targetRatio = targetW / targetH;
-
-  let renderW, renderH, offsetX, offsetY;
-
+  var srcW = media.videoWidth || media.naturalWidth || media.width || targetW;
+  var srcH = media.videoHeight || media.naturalHeight || media.height || targetH;
+  var srcRatio = srcW / srcH;
+  var targetRatio = targetW / targetH;
+  var renderW, renderH, offsetX, offsetY;
   if (srcRatio > targetRatio) {
-    renderH = targetH;
-    renderW = targetH * srcRatio;
-    offsetX = (targetW - renderW) / 2;
-    offsetY = 0;
+    renderH = targetH; renderW = targetH * srcRatio;
+    offsetX = (targetW - renderW) / 2; offsetY = 0;
   } else {
-    renderW = targetW;
-    renderH = targetW / srcRatio;
-    offsetX = 0;
-    offsetY = (targetH - renderH) / 2;
+    renderW = targetW; renderH = targetW / srcRatio;
+    offsetX = 0; offsetY = (targetH - renderH) / 2;
   }
-
   ctx.drawImage(media, offsetX, offsetY, renderW, renderH);
 }
 
-/**
- * ----------------------------------------------------
+/* ============================================================
  * CANVAS COMPOSITOR: RENDER 1 FRAME (1080x1350 4:5)
- * ----------------------------------------------------
- */
+ * ============================================================ */
 function renderFrameToCanvas(ctx, time, introDuration) {
-  const width = state.canvasSize.width;   // 1080
-  const height = state.canvasSize.height; // 1350
-  const crossfadeDuration = 0.6; // 0.6 detik transisi ledakan bintang emas
+  var width = state.canvasSize.width;
+  var height = state.canvasSize.height;
+  var crossfadeDuration = 0.6;
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-
-  // Base background dark navy
   ctx.fillStyle = '#162b3d';
   ctx.fillRect(0, 0, width, height);
 
-  const fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
+  var fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
 
   if (time < fadeStartTime) {
-    // PHASE 1: FULL INTRO VIDEO (Animasi Burung Hantu Sihir)
     drawCoverMedia(ctx, state.introVideo, width, height);
   } else if (time >= fadeStartTime && time < introDuration) {
-    // PHASE 1.5: CROSSFADE PADA KILAU BINTANG EMAS
     drawCoverMedia(ctx, state.introVideo, width, height);
-
-    const progress = (time - fadeStartTime) / crossfadeDuration;
+    var progress = (time - fadeStartTime) / crossfadeDuration;
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, progress));
-
-    if (state.croppedCanvas) {
-      ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
-    }
-    if (state.isFrameLoaded) {
-      ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
-    }
-
+    if (state.croppedCanvas) ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
+    if (state.isFrameLoaded) ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
     ctx.restore();
   } else {
-    // PHASE 2: FULL TWIBBON + FOTO MABA
-    if (state.croppedCanvas) {
-      ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
-    }
-    if (state.isFrameLoaded) {
-      ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
-    }
+    if (state.croppedCanvas) ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
+    if (state.isFrameLoaded) ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
   }
 }
 
-/**
- * ------------------------------------------------------------------
- * VIDEO EXPORT ENGINE v5.0 - NATURAL PLAYBACK RECORDING
- * ------------------------------------------------------------------
+/* ============================================================
+ * VIDEO EXPORT ENGINE v6.0 - PATIENT OFFLINE RENDERING
+ * ============================================================
  * 
- * STRATEGI BARU (anti-patah di HP):
- * 1. Buat video element BARU khusus export (biar gak ganggu state preview)
- * 2. PUTAR video secara NATURAL (play biasa, bukan seek per frame)
- * 3. Setiap frame baru muncul → gambar ke renderCanvas
- * 4. Canvas direkam pakai MediaRecorder via captureStream
- * 5. Setelah video selesai → hold foto twibbon beberapa detik
- * 6. Stop recording → download
+ * Kenapa versi sebelumnya patah di HP:
+ * v3-v4: Frame-seeking terlalu cepat (120ms timeout) → HP gak kuat decode
+ * v5: Natural playback + MediaRecorder real-time → HP gak kuat render 
+ *     1080x1350 + encode secara real-time
  * 
- * Kenapa ini smooth di HP:
- * - Hardware video decoder HP hanya perlu PUTAR video biasa (yang emang smooth)
- * - TIDAK ada seeking ratusan kali (yang bikin patah)
- * - MediaRecorder merekam apa yang ada di canvas secara real-time
- */
-async function startVideoExport() {
+ * Solusi v6 (PATIENT):
+ * - WebCodecs: Seek SABAR (500ms timeout, 50ms cooldown per frame)
+ *   Output 24fps PERFECT karena timestamp di-set manual, bukan real-time
+ * - Fallback: MediaRecorder 540x675 (4x lebih ringan)
+ * ============================================================ */
+
+function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+function patientSeek(video, targetTime) {
+  return new Promise(function(resolve) {
+    // Kalau udah di posisi yang benar, langsung resolve
+    if (Math.abs(video.currentTime - targetTime) < 0.01 && !video.seeking && video.readyState >= 2) {
+      resolve();
+      return;
+    }
+
+    video.currentTime = targetTime;
+
+    // Kalau udah ready dan gak seeking, resolve
+    if (!video.seeking && video.readyState >= 2) {
+      setTimeout(resolve, 20);
+      return;
+    }
+
+    var resolved = false;
+    function done() {
+      if (resolved) return;
+      resolved = true;
+      video.removeEventListener('seeked', done);
+      resolve();
+    }
+
+    video.addEventListener('seeked', done, { once: true });
+
+    // Safety timeout 500ms - SANGAT sabar
+    setTimeout(done, 500);
+  });
+}
+
+function startVideoExport() {
   if (state.isRendering || !state.croppedCanvas) return;
   state.isRendering = true;
   stopPreviewPlayer();
 
-  // Show processing modal
   el.processingModal.classList.remove('hidden');
   updateExportProgress(0, 'Menyiapkan mesin render...');
 
-  try {
-    await exportNaturalPlayback();
-  } catch (err) {
+  // Deteksi WebCodecs support
+  var hasWebCodecs = (typeof VideoEncoder !== 'undefined') &&
+                     (typeof VideoFrame !== 'undefined') &&
+                     (typeof Mp4Muxer !== 'undefined');
+
+  console.log('[Export] WebCodecs: ' + hasWebCodecs);
+
+  var exportPromise;
+  if (hasWebCodecs) {
+    exportPromise = exportPatientWebCodecs();
+  } else {
+    exportPromise = exportLowResMediaRecorder();
+  }
+
+  exportPromise.catch(function(err) {
     console.error('Export Error:', err);
     el.processingModal.classList.add('hidden');
     state.isRendering = false;
@@ -713,262 +600,415 @@ async function startVideoExport() {
       text: err.message || 'Terjadi kesalahan saat merender video.',
       confirmButtonColor: '#162b3d'
     });
+  });
+}
+
+/* ----------------------------------------------------------
+ * PATH 1: WebCodecs + Mp4Muxer — PATIENT OFFLINE RENDERING
+ * Tidak real-time. Setiap frame di-seek SABAR, lalu di-encode.
+ * Output PASTI smooth karena timestamp manual.
+ * ---------------------------------------------------------- */
+function exportPatientWebCodecs() {
+  return new Promise(function(resolve, reject) {
+    (async function() {
+      try {
+        var fps = 24;
+        var width = 1080;
+        var height = 1350;
+
+        updateExportProgress(2, 'Menyiapkan encoder H.264...');
+
+        // Setup Mp4Muxer
+        var muxer = new Mp4Muxer.Muxer({
+          target: new Mp4Muxer.ArrayBufferTarget(),
+          video: { codec: 'avc', width: width, height: height },
+          fastStart: 'in-memory'
+        });
+
+        // Setup VideoEncoder
+        var encoderConfig = {
+          codec: 'avc1.42001f', // Baseline Profile Level 3.1 — max kompatibilitas
+          width: width,
+          height: height,
+          bitrate: 5000000, // 5 Mbps — cukup tajam
+          framerate: fps
+        };
+
+        // Cek apakah config didukung
+        try {
+          var supported = await VideoEncoder.isConfigSupported(encoderConfig);
+          if (!supported.supported) {
+            encoderConfig.codec = 'avc1.420028';
+            var supported2 = await VideoEncoder.isConfigSupported(encoderConfig);
+            if (!supported2.supported) {
+              console.warn('[Export] H.264 not supported, falling back to MediaRecorder');
+              await exportLowResMediaRecorder();
+              resolve();
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[Export] isConfigSupported error, trying anyway');
+        }
+
+        var encoder = new VideoEncoder({
+          output: function(chunk, meta) { muxer.addVideoChunk(chunk, meta); },
+          error: function(e) { console.error('VideoEncoder error:', e); }
+        });
+
+        encoder.configure(encoderConfig);
+
+        // Buat video element BARU khusus export
+        var video = document.createElement('video');
+        video.crossOrigin = 'anonymous';
+        video.playsInline = true;
+        video.muted = true;
+        video.preload = 'auto';
+        video.src = state.introVideo.src;
+
+        updateExportProgress(5, 'Memuat video...');
+
+        // Tunggu video siap
+        await new Promise(function(res, rej) {
+          video.oncanplaythrough = res;
+          video.onerror = function() { rej(new Error('Gagal memuat video')); };
+          video.load();
+        });
+
+        var introDuration = video.duration || 10;
+        var holdDuration = state.holdPhotoDuration;
+        var introFrames = Math.ceil(introDuration * fps);
+        var holdFrames = Math.ceil(holdDuration * fps);
+        var totalFrames = introFrames + holdFrames;
+
+        console.log('[Export] Intro: ' + introDuration.toFixed(1) + 's (' + introFrames + ' frames), Hold: ' + holdDuration + 's (' + holdFrames + ' frames), Total: ' + totalFrames + ' frames');
+
+        // Buat canvas khusus render export
+        var exportCanvas = document.createElement('canvas');
+        exportCanvas.width = width;
+        exportCanvas.height = height;
+        var exportCtx = exportCanvas.getContext('2d');
+
+        // ===== PHASE 1: Render intro video (PATIENT frame-by-frame) =====
+        updateExportProgress(8, 'Merender video intro...');
+
+        for (var i = 0; i < introFrames; i++) {
+          var currentTime = i / fps;
+
+          // Seek SABAR — tunggu sampai 500ms
+          var seekTarget = Math.min(currentTime, Math.max(0, video.duration - 0.02));
+          await patientSeek(video, seekTarget);
+
+          // Gambar frame ke canvas
+          renderFrameForExport(exportCtx, video, currentTime, introDuration, width, height);
+
+          // Encode frame — timestamp manual = SELALU smooth
+          var timestampUs = Math.round(i * (1000000 / fps));
+          var isKeyFrame = (i % (fps * 2) === 0); // Keyframe setiap 2 detik
+
+          var vFrame = new VideoFrame(exportCanvas, { timestamp: timestampUs });
+          encoder.encode(vFrame, { keyFrame: isKeyFrame });
+          vFrame.close();
+
+          // Tunggu encoder kalau queue penuh
+          while (encoder.encodeQueueSize > 10) {
+            await sleep(20);
+          }
+
+          // Progress update
+          var pct = Math.round((i / totalFrames) * 85) + 8;
+          updateExportProgress(pct, 'Frame ' + (i + 1) + '/' + totalFrames + ' (' + currentTime.toFixed(1) + 's)');
+
+          // CRITICAL: Cooldown 30ms agar hardware decoder punya waktu istirahat
+          await sleep(30);
+        }
+
+        // ===== PHASE 2: Render foto twibbon hold (TANPA seeking) =====
+        updateExportProgress(93, 'Merender foto twibbon...');
+
+        for (var j = 0; j < holdFrames; j++) {
+          var frameIdx = introFrames + j;
+          var holdTime = introDuration + (j / fps);
+
+          // Gambar foto + frame (statis, sangat cepat)
+          exportCtx.fillStyle = '#162b3d';
+          exportCtx.fillRect(0, 0, width, height);
+          if (state.croppedCanvas) exportCtx.drawImage(state.croppedCanvas, 0, 0, width, height);
+          if (state.isFrameLoaded) exportCtx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
+
+          var tsUs = Math.round(frameIdx * (1000000 / fps));
+          var vf = new VideoFrame(exportCanvas, { timestamp: tsUs });
+          encoder.encode(vf, { keyFrame: j === 0 });
+          vf.close();
+
+          while (encoder.encodeQueueSize > 10) {
+            await sleep(20);
+          }
+
+          if (j % 10 === 0) {
+            var p2 = 93 + Math.round((j / holdFrames) * 5);
+            updateExportProgress(p2, 'Foto: ' + (j + 1) + '/' + holdFrames);
+            await sleep(5);
+          }
+        }
+
+        // ===== PHASE 3: Finalisasi MP4 =====
+        updateExportProgress(98, 'Menyelesaikan file MP4...');
+
+        await encoder.flush();
+        muxer.finalize();
+
+        // Cleanup
+        video.src = '';
+        video.load();
+
+        // Download
+        var buffer = muxer.target.buffer;
+        var blob = new Blob([buffer], { type: 'video/mp4' });
+        var filename = 'Twibbon_PKKMB_LPKIA_' + Date.now() + '.mp4';
+
+        updateExportProgress(100, 'Selesai! Mengunduh...');
+        downloadBlob(blob, filename);
+
+        setTimeout(function() {
+          el.processingModal.classList.add('hidden');
+          state.isRendering = false;
+          startPreviewPlayer();
+          Swal.fire({
+            icon: 'success',
+            title: 'Video Berhasil Dibuat!',
+            html: '<b>' + filename + '</b><br><small>MP4 H.264 • 1080x1350 • ' + fps + 'fps • Patient Render</small>',
+            confirmButtonColor: '#162b3d'
+          });
+        }, 500);
+
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    })();
+  });
+}
+
+/* Helper: Render 1 frame untuk export (pakai video element terpisah) */
+function renderFrameForExport(ctx, video, time, introDuration, width, height) {
+  var crossfadeDuration = 0.6;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#162b3d';
+  ctx.fillRect(0, 0, width, height);
+
+  var fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
+
+  if (time < fadeStartTime) {
+    drawCoverMedia(ctx, video, width, height);
+  } else if (time >= fadeStartTime && time < introDuration) {
+    drawCoverMedia(ctx, video, width, height);
+    var progress = (time - fadeStartTime) / crossfadeDuration;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, Math.max(0, progress));
+    if (state.croppedCanvas) ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
+    if (state.isFrameLoaded) ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
+    ctx.restore();
+  } else {
+    if (state.croppedCanvas) ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
+    if (state.isFrameLoaded) ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
   }
 }
 
-/**
- * CORE EXPORT: Natural Playback Recording
- * Video diputar biasa → canvas direkam → zero seeking → smooth di HP
- */
-async function exportNaturalPlayback() {
-  const width = state.canvasSize.width;   // 1080
-  const height = state.canvasSize.height; // 1350
-  const renderCanvas = state.renderCanvas;
-  const renderCtx = state.renderCtx;
+/* ----------------------------------------------------------
+ * PATH 2: MediaRecorder FALLBACK — RESOLUSI KECIL
+ * Untuk browser tanpa WebCodecs (iOS Safari, Firefox)
+ * Render di 540x675 agar HP kuat handle real-time
+ * ---------------------------------------------------------- */
+function exportLowResMediaRecorder() {
+  return new Promise(function(resolve, reject) {
+    (async function() {
+      try {
+        var exportW = 540;
+        var exportH = 675;
+        var fps = 24;
 
-  // ========== PHASE 0: Setup MediaRecorder ==========
-  updateExportProgress(2, 'Memulai perekaman canvas...');
-  
-  const fps = 30;
-  const stream = renderCanvas.captureStream(fps);
-  
-  // Pilih MIME type terbaik yang tersedia
-  let mimeType = 'video/mp4;codecs=avc1';
-  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
-  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp9,opus';
-  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp8,opus';
-  if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+        updateExportProgress(3, 'Memulai render (resolusi ringan)...');
 
-  console.log(`[Export] Menggunakan MIME: ${mimeType}`);
+        // Canvas kecil khusus export
+        var smallCanvas = document.createElement('canvas');
+        smallCanvas.width = exportW;
+        smallCanvas.height = exportH;
+        var smallCtx = smallCanvas.getContext('2d');
 
-  const mediaRecorder = new MediaRecorder(stream, {
-    mimeType: mimeType,
-    videoBitsPerSecond: 8_000_000 // 8 Mbps — cukup crisp, gak terlalu berat
-  });
+        // Setup MediaRecorder
+        var stream = smallCanvas.captureStream(fps);
+        var mimeType = 'video/mp4;codecs=avc1';
+        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
+        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp9,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp8,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
 
-  const recordedChunks = [];
-  mediaRecorder.ondataavailable = (e) => {
-    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-  };
+        console.log('[Export Fallback] MIME: ' + mimeType + ', Resolution: ' + exportW + 'x' + exportH);
 
-  // Promise yang resolve ketika recording selesai
-  const recordingDone = new Promise((resolve) => {
-    mediaRecorder.onstop = () => resolve();
-  });
+        var recorder = new MediaRecorder(stream, {
+          mimeType: mimeType,
+          videoBitsPerSecond: 3000000 // 3 Mbps — ringan
+        });
 
-  // Mulai recording
-  mediaRecorder.start(100); // Collect chunks setiap 100ms
+        var chunks = [];
+        recorder.ondataavailable = function(e) {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
 
-  // ========== PHASE 1: Putar Video Intro Secara Natural ==========
-  updateExportProgress(5, 'Memutar video intro (natural playback)...');
+        var recDone = new Promise(function(res) { recorder.onstop = res; });
+        recorder.start(100);
 
-  // Buat video element baru khusus export
-  const exportVideo = document.createElement('video');
-  exportVideo.crossOrigin = 'anonymous';
-  exportVideo.playsInline = true;
-  exportVideo.muted = true;
-  exportVideo.preload = 'auto';
-  exportVideo.src = state.introVideo.src;
+        // Buat video terpisah
+        var video = document.createElement('video');
+        video.crossOrigin = 'anonymous';
+        video.playsInline = true;
+        video.muted = true;
+        video.preload = 'auto';
+        video.src = state.introVideo.src;
 
-  // Tunggu video siap
-  await new Promise((resolve, reject) => {
-    exportVideo.oncanplaythrough = resolve;
-    exportVideo.onerror = () => reject(new Error('Gagal memuat video untuk export'));
-    exportVideo.load();
-  });
+        await new Promise(function(res, rej) {
+          video.oncanplaythrough = res;
+          video.onerror = function() { rej(new Error('Gagal memuat video')); };
+          video.load();
+        });
 
-  const introDuration = exportVideo.duration || 10;
-  const holdDuration = state.holdPhotoDuration;
-  const totalDuration = introDuration + holdDuration;
+        var introDuration = video.duration || 10;
+        var holdDuration = state.holdPhotoDuration;
+        var totalDuration = introDuration + holdDuration;
 
-  console.log(`[Export] Durasi intro: ${introDuration.toFixed(1)}s, hold: ${holdDuration}s, total: ${totalDuration.toFixed(1)}s`);
+        updateExportProgress(8, 'Memutar video (resolusi ringan)...');
 
-  // Putar video dari awal
-  exportVideo.currentTime = 0;
-  
-  // Render loop selama video intro
-  // Pakai requestVideoFrameCallback kalau tersedia (lebih presisi), 
-  // fallback ke requestAnimationFrame
-  const hasRVFC = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
-  
-  await new Promise((resolve) => {
-    let videoEnded = false;
-    const playStartTime = performance.now();
+        // PUTAR video natural di resolusi kecil
+        video.currentTime = 0;
 
-    function drawVideoFrame() {
-      if (videoEnded) return;
+        // Scale down: gambar video 1080x1350 → 540x675
+        await new Promise(function(res) {
+          var startTime = performance.now();
+          var videoEnded = false;
 
-      const elapsed = (performance.now() - playStartTime) / 1000;
-      const progress = Math.min(85, Math.round((elapsed / totalDuration) * 85) + 5);
-      updateExportProgress(progress, `Merekam video: ${elapsed.toFixed(1)}s / ${introDuration.toFixed(1)}s`);
+          function drawFrame() {
+            if (videoEnded) return;
+            var elapsed = (performance.now() - startTime) / 1000;
+            var pct = Math.round((elapsed / totalDuration) * 80) + 8;
+            updateExportProgress(Math.min(88, pct), 'Merekam: ' + elapsed.toFixed(1) + 's / ' + introDuration.toFixed(1) + 's');
 
-      // Gambar frame video ke canvas
-      renderCtx.fillStyle = '#162b3d';
-      renderCtx.fillRect(0, 0, width, height);
-      drawCoverMedia(renderCtx, exportVideo, width, height);
+            // Render ke canvas kecil
+            smallCtx.fillStyle = '#162b3d';
+            smallCtx.fillRect(0, 0, exportW, exportH);
+            drawCoverMedia(smallCtx, video, exportW, exportH);
 
-      if (hasRVFC && !exportVideo.ended) {
-        exportVideo.requestVideoFrameCallback(drawVideoFrame);
-      } else if (!exportVideo.ended) {
-        requestAnimationFrame(drawVideoFrame);
-      }
-    }
+            requestAnimationFrame(drawFrame);
+          }
 
-    // Ketika video selesai
-    exportVideo.onended = () => {
-      videoEnded = true;
-      console.log('[Export] Video intro selesai diputar');
-      resolve();
-    };
+          video.onended = function() {
+            videoEnded = true;
+            res();
+          };
 
-    // Mulai putar & render
-    if (hasRVFC) {
-      exportVideo.requestVideoFrameCallback(drawVideoFrame);
-    } else {
-      requestAnimationFrame(drawVideoFrame);
-    }
-    
-    exportVideo.play().catch((e) => {
-      console.error('[Export] Gagal putar video:', e);
-      // Fallback: skip video, langsung ke foto
-      resolve();
-    });
-  });
+          requestAnimationFrame(drawFrame);
+          video.play().catch(function() { res(); });
+        });
 
-  // ========== PHASE 2: Hold Foto Twibbon ==========
-  updateExportProgress(88, 'Merekam foto twibbon...');
+        // Hold foto di resolusi kecil
+        updateExportProgress(90, 'Merekam foto twibbon...');
 
-  // Gambar foto twibbon + frame ke canvas
-  renderCtx.fillStyle = '#162b3d';
-  renderCtx.fillRect(0, 0, width, height);
-  
-  if (state.croppedCanvas) {
-    renderCtx.drawImage(state.croppedCanvas, 0, 0, width, height);
-  }
-  if (state.isFrameLoaded) {
-    renderCtx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
-  }
+        // Buat scaled-down version foto
+        var smallPhoto = document.createElement('canvas');
+        smallPhoto.width = exportW;
+        smallPhoto.height = exportH;
+        var spCtx = smallPhoto.getContext('2d');
+        if (state.croppedCanvas) spCtx.drawImage(state.croppedCanvas, 0, 0, exportW, exportH);
+        if (state.isFrameLoaded) spCtx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, exportW, exportH);
 
-  // Hold foto selama holdDuration detik
-  // Kita perlu terus "redraw" canvas agar MediaRecorder tetap punya frame baru
-  await new Promise((resolve) => {
-    const holdStart = performance.now();
-    const holdMs = holdDuration * 1000;
+        await new Promise(function(res) {
+          var holdStart = performance.now();
+          var holdMs = holdDuration * 1000;
+          function holdFrame() {
+            var elapsed = performance.now() - holdStart;
+            if (elapsed >= holdMs) { res(); return; }
+            smallCtx.drawImage(smallPhoto, 0, 0);
+            var hp = 90 + Math.round((elapsed / holdMs) * 8);
+            updateExportProgress(Math.min(98, hp), 'Foto: ' + (elapsed / 1000).toFixed(1) + 's');
+            requestAnimationFrame(holdFrame);
+          }
+          requestAnimationFrame(holdFrame);
+        });
 
-    function holdFrame() {
-      const elapsed = performance.now() - holdStart;
-      
-      if (elapsed >= holdMs) {
+        // Stop recording
+        updateExportProgress(99, 'Menyelesaikan...');
+        recorder.stop();
+        await recDone;
+
+        // Download
+        var isMp4 = mimeType.indexOf('mp4') >= 0;
+        var ext = isMp4 ? 'mp4' : 'webm';
+        var blob = new Blob(chunks, { type: mimeType });
+        var filename = 'Twibbon_PKKMB_LPKIA_' + Date.now() + '.' + ext;
+
+        updateExportProgress(100, 'Selesai!');
+        downloadBlob(blob, filename);
+
+        video.src = '';
+        video.load();
+
+        setTimeout(function() {
+          el.processingModal.classList.add('hidden');
+          state.isRendering = false;
+          startPreviewPlayer();
+          Swal.fire({
+            icon: 'success',
+            title: 'Video Berhasil Dibuat!',
+            html: '<b>' + filename + '</b><br><small>' + exportW + 'x' + exportH + ' • ' + fps + 'fps</small>',
+            confirmButtonColor: '#162b3d'
+          });
+        }, 500);
+
         resolve();
-        return;
+      } catch (err) {
+        reject(err);
       }
-
-      // Redraw foto (agar captureStream tetap generate frame baru)
-      renderCtx.fillStyle = '#162b3d';
-      renderCtx.fillRect(0, 0, width, height);
-      if (state.croppedCanvas) {
-        renderCtx.drawImage(state.croppedCanvas, 0, 0, width, height);
-      }
-      if (state.isFrameLoaded) {
-        renderCtx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
-      }
-
-      const holdProgress = Math.round((elapsed / holdMs) * 10) + 88;
-      updateExportProgress(Math.min(98, holdProgress), `Merekam foto: ${(elapsed/1000).toFixed(1)}s / ${holdDuration}s`);
-
-      requestAnimationFrame(holdFrame);
-    }
-
-    requestAnimationFrame(holdFrame);
+    })();
   });
-
-  // ========== PHASE 3: Finalisasi ==========
-  updateExportProgress(99, 'Menyelesaikan video...');
-
-  mediaRecorder.stop();
-  await recordingDone;
-
-  // Cleanup export video
-  exportVideo.src = '';
-  exportVideo.load();
-
-  // Download file
-  const isMp4 = mimeType.includes('mp4');
-  const ext = isMp4 ? 'mp4' : 'webm';
-  const blob = new Blob(recordedChunks, { type: mimeType });
-  const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.${ext}`;
-
-  updateExportProgress(100, 'Selesai! Mengunduh video...');
-  downloadBlob(blob, filename);
-
-  // Done!
-  setTimeout(() => {
-    el.processingModal.classList.add('hidden');
-    state.isRendering = false;
-    startPreviewPlayer();
-    Swal.fire({
-      icon: 'success',
-      title: 'Video Berhasil Dibuat!',
-      html: `File <b>${filename}</b> berhasil diunduh.<br><small class="text-slate-500">Format: ${mimeType} • Resolusi: ${width}x${height}</small>`,
-      confirmButtonColor: '#162b3d'
-    });
-  }, 600);
 }
 
 function updateExportProgress(percent, text) {
-  if (el.processingProgressFill) el.processingProgressFill.style.width = `${percent}%`;
-  if (el.processingPercentText) el.processingPercentText.textContent = `${percent}%`;
+  if (el.processingProgressFill) el.processingProgressFill.style.width = percent + '%';
+  if (el.processingPercentText) el.processingPercentText.textContent = percent + '%';
   if (el.processingStatusText) el.processingStatusText.textContent = text;
 }
 
-/**
- * ----------------------------------------------------
+/* ============================================================
  * STATIC PHOTO EXPORT (Instant PNG)
- * ----------------------------------------------------
- */
+ * ============================================================ */
 function exportStaticPhoto() {
   if (!state.croppedCanvas) return;
-
-  const exportCanvas = document.createElement('canvas');
+  var exportCanvas = document.createElement('canvas');
   exportCanvas.width = state.canvasSize.width;
   exportCanvas.height = state.canvasSize.height;
-  const ctx = exportCanvas.getContext('2d');
-
-  // 1. Draw Cropped Photo
+  var ctx = exportCanvas.getContext('2d');
   ctx.drawImage(state.croppedCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
-
-  // 2. Draw Frame
   if (state.isFrameLoaded) {
     ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, exportCanvas.width, exportCanvas.height);
   }
-
-  // Export to Blob
-  exportCanvas.toBlob((blob) => {
-    const filename = `Twibbon_Foto_Maba_${Date.now()}.png`;
+  exportCanvas.toBlob(function(blob) {
+    var filename = 'Twibbon_Foto_Maba_' + Date.now() + '.png';
     downloadBlob(blob, filename);
-
-    Swal.fire({
-      icon: 'success',
-      title: 'Foto Twibbon Diunduh',
-      text: `File ${filename} berhasil disimpan dalam resolusi tinggi.`,
-      confirmButtonColor: '#162b3d'
-    });
+    Swal.fire({ icon: 'success', title: 'Foto Twibbon Diunduh', text: 'File ' + filename + ' berhasil disimpan.', confirmButtonColor: '#162b3d' });
   }, 'image/png');
 }
 
-/**
- * Helper: Download Blob File
- */
 function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.style.display = 'none';
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => {
+  setTimeout(function() {
     document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
   }, 100);
 }
