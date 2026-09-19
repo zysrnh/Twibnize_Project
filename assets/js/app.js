@@ -666,14 +666,6 @@ function renderFrameToCanvas(ctx, time, introDuration) {
     if (state.isFrameLoaded) {
       ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
     }
-
-    // 3. Subtle flat intro pop effect when photo first appears
-    const photoTime = time - introDuration;
-    if (photoTime < 0.4) {
-      const flashOpacity = (1 - (photoTime / 0.4)) * 0.4;
-      ctx.fillStyle = `rgba(255, 255, 255, ${flashOpacity})`;
-      ctx.fillRect(0, 0, width, height);
-    }
   }
 }
 
