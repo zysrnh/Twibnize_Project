@@ -1,6 +1,10 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * Stack: HTML5 Canvas, WebCodecs, mp4-muxer, MediaRecorder, Cropper.js
+ * v5.0 - Natural Playback Recording (Zero Frame-Seeking)
+ * 
+ * Strategi: Video diputar NATURAL (bukan seek per-frame), lalu canvas 
+ * direkam pakai MediaRecorder. HP handle smooth karena hardware decoder
+ * cuma putar video biasa — TANPA seeking sama sekali.
  */
 
 // Global App State
@@ -19,9 +23,9 @@ const state = {
   renderCanvas: null,
   renderCtx: null,
   animFrameId: null,
-  totalVideoDuration: 10, // default intro duration
-  holdPhotoDuration: 5,   // seconds to hold photo after video
-  aspectRatio: 1080 / 1350, // 4:5 Portrait Full HD
+  totalVideoDuration: 10,
+  holdPhotoDuration: 5,
+  aspectRatio: 1080 / 1350,
   canvasSize: { width: 1080, height: 1350 }
 };
 
@@ -671,8 +675,21 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 
 /**
  * ------------------------------------------------------------------
- * VIDEO EXPORT ENGINE (WebCodecs + Mp4Muxer / Ultra HD H.264 MP4)
+ * VIDEO EXPORT ENGINE v5.0 - NATURAL PLAYBACK RECORDING
  * ------------------------------------------------------------------
+ * 
+ * STRATEGI BARU (anti-patah di HP):
+ * 1. Buat video element BARU khusus export (biar gak ganggu state preview)
+ * 2. PUTAR video secara NATURAL (play biasa, bukan seek per frame)
+ * 3. Setiap frame baru muncul → gambar ke renderCanvas
+ * 4. Canvas direkam pakai MediaRecorder via captureStream
+ * 5. Setelah video selesai → hold foto twibbon beberapa detik
+ * 6. Stop recording → download
+ * 
+ * Kenapa ini smooth di HP:
+ * - Hardware video decoder HP hanya perlu PUTAR video biasa (yang emang smooth)
+ * - TIDAK ada seeking ratusan kali (yang bikin patah)
+ * - MediaRecorder merekam apa yang ada di canvas secara real-time
  */
 async function startVideoExport() {
   if (state.isRendering || !state.croppedCanvas) return;
@@ -681,29 +698,10 @@ async function startVideoExport() {
 
   // Show processing modal
   el.processingModal.classList.remove('hidden');
-  updateExportProgress(0, 'Menyiapkan mesin render Ultra HD...');
+  updateExportProgress(0, 'Menyiapkan mesin render...');
 
   try {
-    const fps = 30;
-    const introDuration = state.introVideo.duration && !isNaN(state.introVideo.duration)
-      ? state.introVideo.duration
-      : 10.0;
-    const totalDuration = introDuration + state.holdPhotoDuration;
-    const totalFrames = Math.ceil(totalDuration * fps);
-
-    const width = state.canvasSize.width;   // 1080
-    const height = state.canvasSize.height; // 1350
-
-    const supportsWebCodecs = typeof window.VideoEncoder !== 'undefined' && 
-                              typeof window.VideoFrame !== 'undefined' && 
-                              typeof window.Mp4Muxer !== 'undefined';
-
-    if (supportsWebCodecs) {
-      await exportVideoWithWebCodecs({ fps, introDuration, totalDuration, totalFrames, width, height });
-    } else {
-      console.warn('WebCodecs not supported, using MediaRecorder fallback.');
-      await exportVideoWithMediaRecorder({ fps, introDuration, totalDuration, totalFrames, width, height });
-    }
+    await exportNaturalPlayback();
   } catch (err) {
     console.error('Export Error:', err);
     el.processingModal.classList.add('hidden');
@@ -719,110 +717,33 @@ async function startVideoExport() {
 }
 
 /**
- * Primary Exporter: True ISO MP4 with WebCodecs & Mp4Muxer (10 Mbps Crisp Ultra HD)
+ * CORE EXPORT: Natural Playback Recording
+ * Video diputar biasa → canvas direkam → zero seeking → smooth di HP
  */
-async function exportVideoWithWebCodecs({ fps, introDuration, totalDuration, totalFrames, width, height }) {
-  updateExportProgress(5, 'Menginisialisasi encoder H.264 MP4 (10 Mbps)...');
-
-  const muxerOptions = {
-    target: new Mp4Muxer.ArrayBufferTarget(),
-    video: {
-      codec: 'avc',
-      width: width,
-      height: height
-    },
-    fastStart: 'in-memory'
-  };
-
-  const muxer = new Mp4Muxer.Muxer(muxerOptions);
-
-  let encoderConfig = {
-    codec: 'avc1.420028', // H.264 Main Profile
-    width: width,
-    height: height,
-    bitrate: 10_000_000,  // 10 Mbps Ultra Crisp High Definition
-    framerate: fps
-  };
-
-  try {
-    const isVideoSupported = await VideoEncoder.isConfigSupported(encoderConfig);
-    if (!isVideoSupported.supported) {
-      encoderConfig.codec = 'avc1.42001f';
-    }
-  } catch (e) {
-    encoderConfig.codec = 'avc1.42001f';
-  }
-
-  const videoEncoder = new VideoEncoder({
-    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-    error: (e) => console.error('VideoEncoder error:', e)
-  });
-
-  videoEncoder.configure(encoderConfig);
-
-  state.introVideo.pause();
-
+async function exportNaturalPlayback() {
+  const width = state.canvasSize.width;   // 1080
+  const height = state.canvasSize.height; // 1350
   const renderCanvas = state.renderCanvas;
   const renderCtx = state.renderCtx;
 
-  for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
-    const currentTime = frameIndex / fps;
-
-    if (currentTime <= introDuration) {
-      state.introVideo.currentTime = Math.min(currentTime, Math.max(0, (state.introVideo.duration || 0.1) - 0.05));
-      await waitForSeek(state.introVideo);
-    }
-
-    renderFrameToCanvas(renderCtx, currentTime, introDuration);
-
-    const timestampUs = Math.round(frameIndex * (1000000 / fps));
-    const isKeyFrame = frameIndex % 30 === 0;
-
-    const vFrame = new VideoFrame(renderCanvas, {
-      timestamp: timestampUs
-    });
-
-    videoEncoder.encode(vFrame, { keyFrame: isKeyFrame });
-    vFrame.close();
-
-    const percent = Math.min(98, Math.round((frameIndex / totalFrames) * 100));
-    updateExportProgress(percent, `Merender video Ultra HD: frame ${frameIndex + 1}/${totalFrames} (${currentTime.toFixed(1)}s)`);
-
-    if (frameIndex % 2 === 0) {
-      await new Promise(r => setTimeout(r, 0));
-    }
-  }
-
-  updateExportProgress(99, 'Menyelesaikan file MP4...');
-
-  await videoEncoder.flush();
-  muxer.finalize();
-
-  const buffer = muxer.target.buffer;
-  const blob = new Blob([buffer], { type: 'video/mp4' });
-  const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.mp4`;
-
-  updateExportProgress(100, 'Selesai! Mengunduh video...');
-  downloadBlob(blob, filename);
-
-  finishExport(filename);
-}
-
-/**
- * Fallback Exporter: MediaRecorder with Best Available Format (12 Mbps)
- */
-async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration, totalFrames, width, height }) {
-  const stream = state.renderCanvas.captureStream(fps);
-
+  // ========== PHASE 0: Setup MediaRecorder ==========
+  updateExportProgress(2, 'Memulai perekaman canvas...');
+  
+  const fps = 30;
+  const stream = renderCanvas.captureStream(fps);
+  
+  // Pilih MIME type terbaik yang tersedia
   let mimeType = 'video/mp4;codecs=avc1';
   if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
   if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp9,opus';
   if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp8,opus';
   if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
 
+  console.log(`[Export] Menggunakan MIME: ${mimeType}`);
+
   const mediaRecorder = new MediaRecorder(stream, {
     mimeType: mimeType,
-    videoBitsPerSecond: 12000000
+    videoBitsPerSecond: 8_000_000 // 8 Mbps — cukup crisp, gak terlalu berat
   });
 
   const recordedChunks = [];
@@ -830,60 +751,157 @@ async function exportVideoWithMediaRecorder({ fps, introDuration, totalDuration,
     if (e.data && e.data.size > 0) recordedChunks.push(e.data);
   };
 
-  const recordingPromise = new Promise((resolve) => {
-    mediaRecorder.onstop = () => {
-      const isMp4 = mimeType.includes('mp4');
-      const ext = isMp4 ? 'mp4' : 'webm';
-      const blob = new Blob(recordedChunks, { type: mimeType });
-      const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.${ext}`;
-      downloadBlob(blob, filename);
-      resolve(filename);
-    };
+  // Promise yang resolve ketika recording selesai
+  const recordingDone = new Promise((resolve) => {
+    mediaRecorder.onstop = () => resolve();
   });
 
-  mediaRecorder.start();
-  state.introVideo.pause();
+  // Mulai recording
+  mediaRecorder.start(100); // Collect chunks setiap 100ms
 
-  for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
-    const currentTime = frameIndex / fps;
+  // ========== PHASE 1: Putar Video Intro Secara Natural ==========
+  updateExportProgress(5, 'Memutar video intro (natural playback)...');
 
-    if (currentTime <= introDuration) {
-      state.introVideo.currentTime = Math.min(currentTime, Math.max(0, (state.introVideo.duration || 0.1) - 0.05));
-      await waitForSeek(state.introVideo);
+  // Buat video element baru khusus export
+  const exportVideo = document.createElement('video');
+  exportVideo.crossOrigin = 'anonymous';
+  exportVideo.playsInline = true;
+  exportVideo.muted = true;
+  exportVideo.preload = 'auto';
+  exportVideo.src = state.introVideo.src;
+
+  // Tunggu video siap
+  await new Promise((resolve, reject) => {
+    exportVideo.oncanplaythrough = resolve;
+    exportVideo.onerror = () => reject(new Error('Gagal memuat video untuk export'));
+    exportVideo.load();
+  });
+
+  const introDuration = exportVideo.duration || 10;
+  const holdDuration = state.holdPhotoDuration;
+  const totalDuration = introDuration + holdDuration;
+
+  console.log(`[Export] Durasi intro: ${introDuration.toFixed(1)}s, hold: ${holdDuration}s, total: ${totalDuration.toFixed(1)}s`);
+
+  // Putar video dari awal
+  exportVideo.currentTime = 0;
+  
+  // Render loop selama video intro
+  // Pakai requestVideoFrameCallback kalau tersedia (lebih presisi), 
+  // fallback ke requestAnimationFrame
+  const hasRVFC = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+  
+  await new Promise((resolve) => {
+    let videoEnded = false;
+    const playStartTime = performance.now();
+
+    function drawVideoFrame() {
+      if (videoEnded) return;
+
+      const elapsed = (performance.now() - playStartTime) / 1000;
+      const progress = Math.min(85, Math.round((elapsed / totalDuration) * 85) + 5);
+      updateExportProgress(progress, `Merekam video: ${elapsed.toFixed(1)}s / ${introDuration.toFixed(1)}s`);
+
+      // Gambar frame video ke canvas
+      renderCtx.fillStyle = '#162b3d';
+      renderCtx.fillRect(0, 0, width, height);
+      drawCoverMedia(renderCtx, exportVideo, width, height);
+
+      if (hasRVFC && !exportVideo.ended) {
+        exportVideo.requestVideoFrameCallback(drawVideoFrame);
+      } else if (!exportVideo.ended) {
+        requestAnimationFrame(drawVideoFrame);
+      }
     }
 
-    renderFrameToCanvas(state.renderCtx, currentTime, introDuration);
+    // Ketika video selesai
+    exportVideo.onended = () => {
+      videoEnded = true;
+      console.log('[Export] Video intro selesai diputar');
+      resolve();
+    };
 
-    const percent = Math.min(99, Math.round((frameIndex / totalFrames) * 100));
-    updateExportProgress(percent, `Merender video Ultra HD: frame ${frameIndex + 1}/${totalFrames}`);
+    // Mulai putar & render
+    if (hasRVFC) {
+      exportVideo.requestVideoFrameCallback(drawVideoFrame);
+    } else {
+      requestAnimationFrame(drawVideoFrame);
+    }
+    
+    exportVideo.play().catch((e) => {
+      console.error('[Export] Gagal putar video:', e);
+      // Fallback: skip video, langsung ke foto
+      resolve();
+    });
+  });
 
-    await new Promise(r => setTimeout(r, 1000 / fps));
+  // ========== PHASE 2: Hold Foto Twibbon ==========
+  updateExportProgress(88, 'Merekam foto twibbon...');
+
+  // Gambar foto twibbon + frame ke canvas
+  renderCtx.fillStyle = '#162b3d';
+  renderCtx.fillRect(0, 0, width, height);
+  
+  if (state.croppedCanvas) {
+    renderCtx.drawImage(state.croppedCanvas, 0, 0, width, height);
+  }
+  if (state.isFrameLoaded) {
+    renderCtx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
   }
 
-  mediaRecorder.stop();
-  const filename = await recordingPromise;
-  finishExport(filename);
-}
+  // Hold foto selama holdDuration detik
+  // Kita perlu terus "redraw" canvas agar MediaRecorder tetap punya frame baru
+  await new Promise((resolve) => {
+    const holdStart = performance.now();
+    const holdMs = holdDuration * 1000;
 
-function waitForSeek(video) {
-  return new Promise((resolve) => {
-    if (video.seeking === false && video.readyState >= 2) {
-      setTimeout(resolve, 8);
-      return;
+    function holdFrame() {
+      const elapsed = performance.now() - holdStart;
+      
+      if (elapsed >= holdMs) {
+        resolve();
+        return;
+      }
+
+      // Redraw foto (agar captureStream tetap generate frame baru)
+      renderCtx.fillStyle = '#162b3d';
+      renderCtx.fillRect(0, 0, width, height);
+      if (state.croppedCanvas) {
+        renderCtx.drawImage(state.croppedCanvas, 0, 0, width, height);
+      }
+      if (state.isFrameLoaded) {
+        renderCtx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
+      }
+
+      const holdProgress = Math.round((elapsed / holdMs) * 10) + 88;
+      updateExportProgress(Math.min(98, holdProgress), `Merekam foto: ${(elapsed/1000).toFixed(1)}s / ${holdDuration}s`);
+
+      requestAnimationFrame(holdFrame);
     }
-    const onSeeked = () => {
-      video.removeEventListener('seeked', onSeeked);
-      resolve();
-    };
-    video.addEventListener('seeked', onSeeked, { once: true });
-    setTimeout(() => {
-      video.removeEventListener('seeked', onSeeked);
-      resolve();
-    }, 120);
-  });
-}
 
-function finishExport(filename) {
+    requestAnimationFrame(holdFrame);
+  });
+
+  // ========== PHASE 3: Finalisasi ==========
+  updateExportProgress(99, 'Menyelesaikan video...');
+
+  mediaRecorder.stop();
+  await recordingDone;
+
+  // Cleanup export video
+  exportVideo.src = '';
+  exportVideo.load();
+
+  // Download file
+  const isMp4 = mimeType.includes('mp4');
+  const ext = isMp4 ? 'mp4' : 'webm';
+  const blob = new Blob(recordedChunks, { type: mimeType });
+  const filename = `Twibbon_PKKMB_LPKIA_${Date.now()}.${ext}`;
+
+  updateExportProgress(100, 'Selesai! Mengunduh video...');
+  downloadBlob(blob, filename);
+
+  // Done!
   setTimeout(() => {
     el.processingModal.classList.add('hidden');
     state.isRendering = false;
@@ -891,7 +909,7 @@ function finishExport(filename) {
     Swal.fire({
       icon: 'success',
       title: 'Video Berhasil Dibuat!',
-      text: `File ${filename} berhasil diunduh dengan format MP4 Ultra HD (4:5) jernih dan mulus.`,
+      html: `File <b>${filename}</b> berhasil diunduh.<br><small class="text-slate-500">Format: ${mimeType} • Resolusi: ${width}x${height}</small>`,
       confirmButtonColor: '#162b3d'
     });
   }, 600);
