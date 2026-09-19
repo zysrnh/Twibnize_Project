@@ -93,6 +93,51 @@ if (!is_writable($tempDir)) {
     }
 }
 
+// CONCURRENCY LIMITER: Maksimal 2 proses FFmpeg bersamaan (Anti-Server Down)
+$maxConcurrent = 2;
+$lockDir = $tempDir . '/twib_locks';
+if (!is_dir($lockDir)) {
+    @mkdir($lockDir, 0777, true);
+}
+
+$lockAcquired = false;
+$lockFp = null;
+$maxWaitSeconds = 60; // Batas tunggu antrean 60 detik
+$waitStart = time();
+
+while ((time() - $waitStart) < $maxWaitSeconds) {
+    for ($slot = 1; $slot <= $maxConcurrent; $slot++) {
+        $lockFile = $lockDir . '/slot_' . $slot . '.lock';
+        $fp = @fopen($lockFile, 'c+');
+        if ($fp && @flock($fp, LOCK_EX | LOCK_NB)) {
+            $lockAcquired = true;
+            $lockFp = $fp;
+            break 2;
+        }
+        if ($fp) @fclose($fp);
+    }
+    usleep(300000); // Istirahat 300ms lalu cek slot lagi
+}
+
+if (!$lockAcquired) {
+    http_response_code(429);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'message' => 'Antrean server sedang sangat padat. Mohon tunggu 5 detik lalu klik unduh kembali.'
+    ]);
+    exit;
+}
+
+// Pastikan lock selalu dilepas saat script selesai (shutdown handler)
+register_shutdown_function(function() use (&$lockFp) {
+    if ($lockFp) {
+        @flock($lockFp, LOCK_UN);
+        @fclose($lockFp);
+        $lockFp = null;
+    }
+});
+
 $uniqueId = bin2hex(random_bytes(8));
 $tempPhotoPath = $tempDir . '/twib_in_' . $uniqueId . '.jpg';
 $tempVideoPath = $tempDir . '/twib_out_' . $uniqueId . '.mp4';

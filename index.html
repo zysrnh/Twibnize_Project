@@ -90,32 +90,94 @@
   <!-- MAIN CONTAINER -->
   <main class="max-w-3xl w-full mx-auto p-3 sm:p-5 flex-1 flex flex-col justify-center">
 
-    <!-- STEP 1: UPLOAD PHOTO CARD -->
-    <div id="upload-dropzone" class="flat-card p-6 sm:p-10 text-center border-2 border-dashed border-slate-300 hover:border-[#b69861] bg-white transition-all cursor-pointer animate-pulse-border">
-      <input type="file" id="file-input" accept="image/*" class="hidden">
-      
-      <div class="mx-auto w-16 h-16 bg-[#162b3d] border-2 border-[#b69861] flex items-center justify-center rounded mb-4 text-[#b69861] shadow-sm">
-        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+    <!-- STEP 1: MULTI-PHOTO UPLOAD (1 - 3 FOTO) -->
+    <div id="upload-dropzone" class="flat-card p-4 sm:p-7 bg-white">
+      <div class="text-center mb-5">
+        <h2 class="text-base sm:text-lg font-extrabold text-[#162b3d]">Upload Foto Mahasiswa Baru (1 s/d 3 Foto)</h2>
+        <p class="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
+          Bisa upload <b>1 sampai 3 foto berbeda</b>. Setiap foto akan otomatis dibuatkan 1 video twibbon MP4 berkualitas HD!
+        </p>
       </div>
 
-      <h2 class="text-lg sm:text-xl font-extrabold text-[#162b3d] mb-1">Upload Foto Mahasiswa Baru</h2>
-      <p class="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-6">
-        Pilih foto terbaikmu untuk dimasukkan ke dalam Twibbon Animasi Video PKKMB 2026.
-      </p>
+      <input type="file" id="file-input" accept="image/*" multiple class="hidden">
+      <input type="file" id="slot-input-1" accept="image/*" class="hidden">
+      <input type="file" id="slot-input-2" accept="image/*" class="hidden">
+      <input type="file" id="slot-input-3" accept="image/*" class="hidden">
 
-      <button onclick="document.getElementById('file-input').click()" class="flat-btn flat-btn-primary px-6 py-3 text-sm tracking-wide shadow-sm w-full sm:w-auto">
-        <svg class="w-5 h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
-        Pilih Dari Galeri HP / File
-      </button>
+      <!-- 3 PHOTO SLOTS GRID -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+        <!-- Slot 1 (Wajib) -->
+        <div id="photo-slot-1" class="border-2 border-dashed border-slate-300 hover:border-[#b69861] p-3 text-center rounded-lg bg-slate-50/60 flex flex-col items-center justify-center min-h-[160px] transition-all relative">
+          <div id="slot-empty-1" class="flex flex-col items-center cursor-pointer w-full py-2" onclick="document.getElementById('slot-input-1').click()">
+            <div class="w-10 h-10 bg-[#162b3d] text-[#b69861] rounded-full flex items-center justify-center mb-2 font-black text-sm shadow-sm">1</div>
+            <span class="text-xs font-bold text-[#162b3d]">Foto 1 (Utama)</span>
+            <span class="text-[10px] text-[#830106] font-semibold mt-0.5">Wajib Diisi</span>
+            <button type="button" class="mt-2.5 text-[11px] font-bold text-[#b69861] bg-white border border-[#b69861] px-3 py-1 rounded shadow-sm hover:bg-[#b69861] hover:text-white transition-all">+ Pilih Foto</button>
+          </div>
+          <div id="slot-filled-1" class="hidden w-full flex flex-col items-center">
+            <div class="relative w-20 h-24 mb-1.5 border border-slate-300 rounded overflow-hidden bg-black shadow-sm">
+              <img id="slot-thumb-1" src="" class="w-full h-full object-cover">
+            </div>
+            <span class="text-[11px] font-bold text-[#162b3d] truncate max-w-[130px]" id="slot-name-1">Foto 1</span>
+            <div class="flex space-x-1.5 mt-2">
+              <button type="button" id="btn-change-slot-1" class="text-[10px] font-bold text-[#162b3d] bg-white border border-slate-300 px-2.5 py-0.5 rounded hover:bg-slate-100">Ganti</button>
+              <button type="button" id="btn-remove-slot-1" class="text-[10px] font-bold text-[#830106] bg-white border border-red-200 px-2 py-0.5 rounded hover:bg-red-50">Hapus</button>
+            </div>
+          </div>
+        </div>
 
-      <div class="mt-4 flex items-center justify-center space-x-2 text-[11px] text-slate-400">
-        <span>JPG, PNG, WEBP</span>
-        <span>&bull;</span>
-        <span class="text-[#830106] font-semibold">Maks 15MB</span>
+        <!-- Slot 2 (Opsional) -->
+        <div id="photo-slot-2" class="border-2 border-dashed border-slate-300 hover:border-[#b69861] p-3 text-center rounded-lg bg-slate-50/60 flex flex-col items-center justify-center min-h-[160px] transition-all relative">
+          <div id="slot-empty-2" class="flex flex-col items-center cursor-pointer w-full py-2" onclick="document.getElementById('slot-input-2').click()">
+            <div class="w-10 h-10 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center mb-2 font-black text-sm shadow-sm">2</div>
+            <span class="text-xs font-bold text-[#162b3d]">Foto 2</span>
+            <span class="text-[10px] text-slate-400 mt-0.5">Opsional</span>
+            <button type="button" class="mt-2.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-300 px-3 py-1 rounded shadow-sm hover:bg-slate-200 transition-all">+ Tambah</button>
+          </div>
+          <div id="slot-filled-2" class="hidden w-full flex flex-col items-center">
+            <div class="relative w-20 h-24 mb-1.5 border border-slate-300 rounded overflow-hidden bg-black shadow-sm">
+              <img id="slot-thumb-2" src="" class="w-full h-full object-cover">
+            </div>
+            <span class="text-[11px] font-bold text-[#162b3d] truncate max-w-[130px]" id="slot-name-2">Foto 2</span>
+            <div class="flex space-x-1.5 mt-2">
+              <button type="button" id="btn-change-slot-2" class="text-[10px] font-bold text-[#162b3d] bg-white border border-slate-300 px-2.5 py-0.5 rounded hover:bg-slate-100">Ganti</button>
+              <button type="button" id="btn-remove-slot-2" class="text-[10px] font-bold text-[#830106] bg-white border border-red-200 px-2 py-0.5 rounded hover:bg-red-50">Hapus</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slot 3 (Opsional) -->
+        <div id="photo-slot-3" class="border-2 border-dashed border-slate-300 hover:border-[#b69861] p-3 text-center rounded-lg bg-slate-50/60 flex flex-col items-center justify-center min-h-[160px] transition-all relative">
+          <div id="slot-empty-3" class="flex flex-col items-center cursor-pointer w-full py-2" onclick="document.getElementById('slot-input-3').click()">
+            <div class="w-10 h-10 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center mb-2 font-black text-sm shadow-sm">3</div>
+            <span class="text-xs font-bold text-[#162b3d]">Foto 3</span>
+            <span class="text-[10px] text-slate-400 mt-0.5">Opsional</span>
+            <button type="button" class="mt-2.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-300 px-3 py-1 rounded shadow-sm hover:bg-slate-200 transition-all">+ Tambah</button>
+          </div>
+          <div id="slot-filled-3" class="hidden w-full flex flex-col items-center">
+            <div class="relative w-20 h-24 mb-1.5 border border-slate-300 rounded overflow-hidden bg-black shadow-sm">
+              <img id="slot-thumb-3" src="" class="w-full h-full object-cover">
+            </div>
+            <span class="text-[11px] font-bold text-[#162b3d] truncate max-w-[130px]" id="slot-name-3">Foto 3</span>
+            <div class="flex space-x-1.5 mt-2">
+              <button type="button" id="btn-change-slot-3" class="text-[10px] font-bold text-[#162b3d] bg-white border border-slate-300 px-2.5 py-0.5 rounded hover:bg-slate-100">Ganti</button>
+              <button type="button" id="btn-remove-slot-3" class="text-[10px] font-bold text-[#830106] bg-white border border-red-200 px-2 py-0.5 rounded hover:bg-red-50">Hapus</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK MULTI-UPLOAD & ACTION BAR -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-200">
+        <button type="button" onclick="document.getElementById('file-input').click()" class="flat-btn flat-btn-outline px-3.5 py-2 text-xs w-full sm:w-auto">
+          <svg class="w-4 h-4 mr-1.5 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Pilih Sekaligus (1-3 Foto dari Galeri)
+        </button>
+        <button id="btn-proceed-crop" disabled class="flat-btn flat-btn-primary px-6 py-2.5 text-xs sm:text-sm w-full sm:w-auto disabled:opacity-40 disabled:cursor-not-allowed">
+          Lanjut Atur Posisi (<span id="photo-count-badge">0</span> Foto) &rarr;
+        </button>
       </div>
     </div>
 
@@ -130,6 +192,20 @@
           <input type="checkbox" id="toggle-frame-guide" checked class="rounded border-slate-300 text-[#162b3d] focus:ring-[#b69861]">
           <span>Panduan Frame</span>
         </label>
+      </div>
+
+      <!-- CROPPER TAB BAR (FOTO 1, 2, 3) -->
+      <div id="cropper-tabs-container" class="flex items-center space-x-2 mb-3 border-b border-slate-200 pb-2">
+        <button type="button" id="crop-tab-1" class="px-3 py-1.5 text-xs font-bold rounded flex items-center bg-[#162b3d] text-white">
+          <span>Foto 1</span>
+        </button>
+        <button type="button" id="crop-tab-2" class="hidden px-3 py-1.5 text-xs font-bold rounded flex items-center bg-slate-100 text-slate-700">
+          <span>Foto 2</span>
+        </button>
+        <button type="button" id="crop-tab-3" class="hidden px-3 py-1.5 text-xs font-bold rounded flex items-center bg-slate-100 text-slate-700">
+          <span>Foto 3</span>
+        </button>
+        <span class="text-[11px] text-slate-400 ml-auto font-medium" id="crop-indicator-text">Foto 1 dari 1</span>
       </div>
 
       <!-- CROPPER VIEWPORT (Full Twibbonize Free Move 4:5) -->
@@ -183,7 +259,7 @@
       <!-- ACTION BUTTONS -->
       <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200 max-w-[420px] mx-auto">
         <button id="btn-reupload" class="flat-btn flat-btn-outline w-full sm:w-auto px-4 py-2 text-xs">
-          &larr; Ganti Foto
+          &larr; Ganti / Tambah Foto
         </button>
         <button id="btn-crop-confirm" class="flat-btn flat-btn-primary w-full sm:w-auto px-6 py-2.5 text-sm">
           Lanjut ke Preview Video &rarr;
@@ -200,6 +276,19 @@
         </div>
         <button id="btn-recrop" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
           Atur Ulang Foto
+        </button>
+      </div>
+
+      <!-- PREVIEW TAB SELECTOR (1, 2, 3) -->
+      <div id="preview-tabs-container" class="flex items-center space-x-2 mb-3 border-b border-slate-200 pb-2 max-w-[460px] mx-auto">
+        <button type="button" id="prev-tab-1" class="px-3 py-1.5 text-xs font-bold rounded flex items-center bg-[#162b3d] text-white">
+          <span>Lihat Video 1</span>
+        </button>
+        <button type="button" id="prev-tab-2" class="hidden px-3 py-1.5 text-xs font-bold rounded flex items-center bg-slate-100 text-slate-700">
+          <span>Video 2</span>
+        </button>
+        <button type="button" id="prev-tab-3" class="hidden px-3 py-1.5 text-xs font-bold rounded flex items-center bg-slate-100 text-slate-700">
+          <span>Video 3</span>
         </button>
       </div>
 
@@ -237,13 +326,27 @@
       </div>
 
       <!-- DOWNLOAD BUTTONS -->
-      <div class="max-w-[420px] mx-auto space-y-2 pt-3 border-t border-slate-200">
-        <button id="btn-download-video" class="flat-btn flat-btn-primary w-full py-3 text-sm shadow-sm">
+      <div class="max-w-[460px] mx-auto space-y-2.5 pt-3 border-t border-slate-200">
+        <!-- BATCH DOWNLOAD ALL -->
+        <button id="btn-download-all-videos" class="flat-btn flat-btn-primary w-full py-3.5 text-sm font-black shadow-md">
           <svg class="w-5 h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Download Video Twibbon (MP4)
+          <span id="btn-download-all-text">Download Semua Video (MP4)</span>
         </button>
+
+        <!-- INDIVIDUAL VIDEO BUTTONS (GRID) -->
+        <div id="individual-download-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button id="btn-dl-video-1" class="flat-btn flat-btn-outline py-2 text-xs font-bold">
+            Unduh Video 1
+          </button>
+          <button id="btn-dl-video-2" class="flat-btn flat-btn-outline py-2 text-xs font-bold hidden">
+            Unduh Video 2
+          </button>
+          <button id="btn-dl-video-3" class="flat-btn flat-btn-outline py-2 text-xs font-bold hidden">
+            Unduh Video 3
+          </button>
+        </div>
 
         <button id="btn-download-photo" class="flat-btn flat-btn-accent w-full py-2.5 text-xs">
           <svg class="w-4 h-4 mr-1.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +363,7 @@
   <div id="processing-modal" class="hidden fixed inset-0 bg-[#162b3d]/85 z-50 flex items-center justify-center p-4">
     <div class="bg-white flat-card max-w-sm w-full p-6 text-center shadow-2xl border-2 border-[#b69861]">
       <div class="theme-spinner mx-auto mb-4"></div>
-      <h3 class="text-base font-extrabold text-[#162b3d] mb-1">Sedang Membuat Video...</h3>
+      <h3 id="processing-title-text" class="text-base font-extrabold text-[#162b3d] mb-1">Sedang Membuat Video...</h3>
       <p id="processing-status-text" class="text-xs text-slate-500 mb-4">Menyatukan animasi sihir &amp; foto...</p>
 
       <div class="flat-progress-bar mb-2">
@@ -286,6 +389,6 @@
   </footer>
 
   <!-- App Script -->
-  <script src="assets/js/app.js?v=7.1"></script>
+  <script src="assets/js/app.js?v=8.0"></script>
 </body>
 </html>
