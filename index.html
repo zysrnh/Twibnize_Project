@@ -92,41 +92,51 @@
       </div>
 
       <!-- CROPPER VIEWPORT -->
-      <div class="relative w-full aspect-square bg-slate-900 overflow-hidden border border-slate-300 mb-4 max-w-[460px] mx-auto">
+      <div class="relative w-full aspect-square bg-slate-900 overflow-hidden border border-slate-300 mb-3 max-w-[460px] mx-auto cursor-grab active:cursor-grabbing">
         <img id="cropper-image" src="" alt="Cropper Target" class="max-w-full block">
-        <!-- Overlay Frame Guide -->
+        <!-- Overlay Frame Guide (Auto Transparent Center) -->
         <img id="cropper-frame-overlay" src="assets/frame.svg" alt="Frame Guide" class="crop-frame-guide">
       </div>
 
-      <!-- CROPPER TOOLBAR -->
-      <div class="flex flex-wrap items-center justify-center gap-2 mb-6">
-        <button id="btn-zoom-in" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
-          </svg>
-          Zoom +
-        </button>
-        <button id="btn-zoom-out" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-          </svg>
-          Zoom -
-        </button>
-        <button id="btn-rotate-left" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-          </svg>
-          Putar Kiri
-        </button>
-        <button id="btn-rotate-right" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-          </svg>
-          Putar Kanan
-        </button>
-        <button id="btn-reset-crop" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs text-rose-600 border-rose-200">
-          Reset
-        </button>
+      <!-- INTERACTION HINT -->
+      <p class="text-center text-[11px] text-slate-500 mb-3">
+        👆 <b>Sentuh / Drag</b> foto untuk menggeser. Gunakan <b>Slider</b> atau <b>cubit layar</b> untuk zoom.
+      </p>
+
+      <!-- ZOOM SLIDER & TOOLBAR -->
+      <div class="max-w-[460px] mx-auto bg-slate-50 border border-slate-200 p-3 rounded mb-4">
+        <!-- Zoom Slider -->
+        <div class="flex items-center space-x-3 mb-3">
+          <span class="text-xs font-semibold text-slate-600 flex items-center min-w-[50px]">
+            <svg class="w-4 h-4 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+            </svg>
+            Zoom
+          </span>
+          <input type="range" id="zoom-slider" min="0.2" max="3" step="0.01" value="1" class="w-full accent-blue-700 cursor-pointer">
+          <span id="zoom-level-text" class="text-xs font-bold text-slate-700 min-w-[40px] text-right">100%</span>
+        </div>
+
+        <!-- Quick Rotate & Reset Buttons -->
+        <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+          <div class="space-x-1.5">
+            <button id="btn-rotate-left" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
+              <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+              Putar Kiri
+            </button>
+            <button id="btn-rotate-right" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
+              <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+              </svg>
+              Putar Kanan
+            </button>
+          </div>
+          <button id="btn-reset-crop" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs text-rose-600 border-rose-200">
+            Reset Posisi
+          </button>
+        </div>
       </div>
 
       <!-- ACTION BUTTONS -->

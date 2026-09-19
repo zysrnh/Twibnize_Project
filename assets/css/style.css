@@ -82,14 +82,26 @@ body {
   background-color: #047857;
 }
 
-/* Cropper Container Overrides */
-.cropper-view-box,
-.cropper-face {
+/* Cropper Container Overrides - Twibbonize Smooth Mode */
+.cropper-view-box {
+  outline: none !important;
   border-radius: 0;
 }
 
-.cropper-line, .cropper-point {
-  background-color: #2563eb !important;
+.cropper-dashed,
+.cropper-point,
+.cropper-line,
+.cropper-center {
+  display: none !important;
+}
+
+.cropper-bg {
+  background-image: none !important;
+  background-color: #0f172a !important;
+}
+
+.cropper-modal {
+  opacity: 0.15 !important;
 }
 
 /* Overlay Frame on top of Cropper */
@@ -100,8 +112,8 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.85;
-  z-index: 10;
+  opacity: 1;
+  z-index: 20;
 }
 
 /* Canvas Viewport */

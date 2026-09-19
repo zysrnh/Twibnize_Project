@@ -33,10 +33,10 @@ const el = {
   cropperImage: document.getElementById('cropper-image'),
   cropperFrameOverlay: document.getElementById('cropper-frame-overlay'),
   toggleFrameGuide: document.getElementById('toggle-frame-guide'),
+  zoomSlider: document.getElementById('zoom-slider'),
+  zoomLevelText: document.getElementById('zoom-level-text'),
   btnCropConfirm: document.getElementById('btn-crop-confirm'),
   btnReupload: document.getElementById('btn-reupload'),
-  btnZoomIn: document.getElementById('btn-zoom-in'),
-  btnZoomOut: document.getElementById('btn-zoom-out'),
   btnRotateLeft: document.getElementById('btn-rotate-left'),
   btnRotateRight: document.getElementById('btn-rotate-right'),
   btnResetCrop: document.getElementById('btn-reset-crop'),
@@ -307,12 +307,26 @@ function bindEvents() {
     }
   });
 
-  // Cropper Controls
-  el.btnZoomIn.addEventListener('click', () => state.cropper && state.cropper.zoom(0.1));
-  el.btnZoomOut.addEventListener('click', () => state.cropper && state.cropper.zoom(-0.1));
+  // Cropper Controls - Zoom Slider & Gestures
+  if (el.zoomSlider) {
+    el.zoomSlider.addEventListener('input', (e) => {
+      if (state.cropper) {
+        const val = parseFloat(e.target.value);
+        state.cropper.zoomTo(val);
+        if (el.zoomLevelText) el.zoomLevelText.textContent = `${Math.round(val * 100)}%`;
+      }
+    });
+  }
+
   el.btnRotateLeft.addEventListener('click', () => state.cropper && state.cropper.rotate(-90));
   el.btnRotateRight.addEventListener('click', () => state.cropper && state.cropper.rotate(90));
-  el.btnResetCrop.addEventListener('click', () => state.cropper && state.cropper.reset());
+  el.btnResetCrop.addEventListener('click', () => {
+    if (state.cropper) {
+      state.cropper.reset();
+      if (el.zoomSlider) el.zoomSlider.value = 1;
+      if (el.zoomLevelText) el.zoomLevelText.textContent = '100%';
+    }
+  });
 
   if (el.toggleFrameGuide) {
     el.toggleFrameGuide.addEventListener('change', (e) => {
@@ -422,18 +436,29 @@ function openCropper(imageSrc) {
 
   state.cropper = new Cropper(el.cropperImage, {
     aspectRatio: state.aspectRatio || 1,
-    viewMode: 1,
-    dragMode: 'move',
-    autoCropArea: 0.95,
+    viewMode: 0, // Bebas digeser tanpa batas kaku
+    dragMode: 'move', // Menggeser foto langsung
+    autoCropArea: 1, // Pas 100% frame
     restore: false,
-    guides: true,
-    center: true,
+    guides: false, // Hilangkan garis putus-putus
+    center: false, // Hilangkan tanda plus di tengah
     highlight: false,
-    cropBoxMovable: true,
-    cropBoxResizable: true,
+    cropBoxMovable: false, // Frame terkunci
+    cropBoxResizable: false, // Ukuran frame terkunci
     toggleDragModeOnDblclick: false,
+    zoomOnTouch: true,
+    zoomOnWheel: true,
+    wheelZoomRatio: 0.05,
     ready() {
-      // Cropper siap
+      if (el.zoomSlider) el.zoomSlider.value = 1;
+      if (el.zoomLevelText) el.zoomLevelText.textContent = '100%';
+    },
+    zoom(e) {
+      if (el.zoomSlider && e.detail && e.detail.ratio) {
+        const ratio = Math.min(3, Math.max(0.2, e.detail.ratio));
+        el.zoomSlider.value = ratio;
+        if (el.zoomLevelText) el.zoomLevelText.textContent = `${Math.round(ratio * 100)}%`;
+      }
     }
   });
 }
