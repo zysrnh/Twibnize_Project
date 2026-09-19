@@ -1,15 +1,11 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v8.0 - Multi-Photo (1-3 Videos) + High-Concurrency Server Engine
+ * v9.0 - Multi-Photo (1-3 Videos) with Clean Single-Card Upload & Server Concurrency Limiter
  */
 
 // Global App State
 const state = {
-  photos: [
-    { id: 1, rawSrc: null, fileName: '', croppedCanvas: null },
-    { id: 2, rawSrc: null, fileName: '', croppedCanvas: null },
-    { id: 3, rawSrc: null, fileName: '', croppedCanvas: null }
-  ],
+  photos: [], // Array of { id: number, rawSrc: string, fileName: string, croppedCanvas: HTMLCanvasElement | null }
   activeCropIndex: 0,
   activePreviewIndex: 0,
   cropper: null,
@@ -28,25 +24,34 @@ const state = {
   totalVideoDuration: 10,
   holdPhotoDuration: 5,
   aspectRatio: 1080 / 1350,
-  canvasSize: { width: 1080, height: 1350 }
+  canvasSize: { width: 1080, height: 1350 },
+  replaceTargetIndex: -1
 };
 
-// DOM Elements
+// DOM Elements Cache
 const el = {
+  // Step 1 Elements
   fileInput: document.getElementById('file-input'),
-  slotInputs: [
-    document.getElementById('slot-input-1'),
-    document.getElementById('slot-input-2'),
-    document.getElementById('slot-input-3')
-  ],
+  slotInputExtra: document.getElementById('slot-input-extra'),
+  slotReplaceInput: document.getElementById('slot-replace-input'),
+  uploadDropzone: document.getElementById('upload-dropzone'),
+  uploadInitialState: document.getElementById('upload-initial-state'),
+  uploadSelectedState: document.getElementById('upload-selected-state'),
+  btnInitialAddExtra: document.getElementById('btn-initial-add-extra'),
+  btnAddMorePhotos: document.getElementById('btn-add-more-photos'),
+  btnResetAllPhotos: document.getElementById('btn-reset-all-photos'),
   btnProceedCrop: document.getElementById('btn-proceed-crop'),
   photoCountBadge: document.getElementById('photo-count-badge'),
-  uploadDropzone: document.getElementById('upload-dropzone'),
+  remainingCountBadge: document.getElementById('remaining-count-badge'),
+  btnCropCount: document.getElementById('btn-crop-count'),
+  selectedPhotosGrid: document.getElementById('selected-photos-grid'),
 
+  // Step 2 Cropper Elements
   cropperSection: document.getElementById('cropper-section'),
   cropperImage: document.getElementById('cropper-image'),
   cropperFrameOverlay: document.getElementById('cropper-frame-overlay'),
   toggleFrameGuide: document.getElementById('toggle-frame-guide'),
+  cropperTabsContainer: document.getElementById('cropper-tabs-container'),
   cropTabs: [
     document.getElementById('crop-tab-1'),
     document.getElementById('crop-tab-2'),
@@ -61,7 +66,9 @@ const el = {
   btnRotateRight: document.getElementById('btn-rotate-right'),
   btnResetCrop: document.getElementById('btn-reset-crop'),
 
+  // Step 3 Preview & Download Elements
   previewSection: document.getElementById('preview-section'),
+  previewTabsContainer: document.getElementById('preview-tabs-container'),
   previewTabs: [
     document.getElementById('prev-tab-1'),
     document.getElementById('prev-tab-2'),
@@ -76,11 +83,13 @@ const el = {
 
   btnDownloadAllVideos: document.getElementById('btn-download-all-videos'),
   btnDownloadAllText: document.getElementById('btn-download-all-text'),
+  individualDownloadGrid: document.getElementById('individual-download-grid'),
   btnDlVideo1: document.getElementById('btn-dl-video-1'),
   btnDlVideo2: document.getElementById('btn-dl-video-2'),
   btnDlVideo3: document.getElementById('btn-dl-video-3'),
   btnDownloadPhoto: document.getElementById('btn-download-photo'),
 
+  // Processing Modal Elements
   processingModal: document.getElementById('processing-modal'),
   processingTitleText: document.getElementById('processing-title-text'),
   processingProgressFill: document.getElementById('processing-progress-fill'),
@@ -93,6 +102,7 @@ document.addEventListener('DOMContentLoaded', function() {
   initCanvases();
   loadDefaultAssets();
   bindEvents();
+  renderSelectedPhotosUI();
 });
 
 function initCanvases() {
@@ -210,55 +220,106 @@ function loadFirstAvailableVideo(candidates, index) {
 
 // Event Bindings
 function bindEvents() {
-  el.slotInputs.forEach(function(input, idx) {
-    if (input) {
-      input.addEventListener('change', function(e) {
-        if (e.target.files && e.target.files[0]) {
-          handleFileForSlot(idx, e.target.files[0]);
-        }
-      });
-    }
-  });
-
+  // 1. File Input (Initial / Multi Selection)
   if (el.fileInput) {
     el.fileInput.addEventListener('change', function(e) {
       if (e.target.files && e.target.files.length > 0) {
-        var files = Array.from(e.target.files).slice(0, 3);
-        files.forEach(function(file, i) {
-          handleFileForSlot(i, file);
-        });
+        handleIncomingFiles(Array.from(e.target.files));
       }
+      e.target.value = '';
     });
   }
 
-  [1, 2, 3].forEach(function(num) {
-    var btnChange = document.getElementById('btn-change-slot-' + num);
-    var btnRemove = document.getElementById('btn-remove-slot-' + num);
-    if (btnChange) {
-      btnChange.addEventListener('click', function(e) {
-        e.stopPropagation();
-        el.slotInputs[num - 1].click();
-      });
-    }
-    if (btnRemove) {
-      btnRemove.addEventListener('click', function(e) {
-        e.stopPropagation();
-        removeSlot(num - 1);
-      });
-    }
-  });
+  // 2. Extra Photo Input (When clicking "+ Tambah Foto")
+  if (el.slotInputExtra) {
+    el.slotInputExtra.addEventListener('change', function(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        handleIncomingFiles(Array.from(e.target.files));
+      }
+      e.target.value = '';
+    });
+  }
 
+  // 3. Replace Photo Input (When clicking "Ganti" on a specific photo)
+  if (el.slotReplaceInput) {
+    el.slotReplaceInput.addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0] && state.replaceTargetIndex >= 0) {
+        replaceSinglePhoto(state.replaceTargetIndex, e.target.files[0]);
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Button Initial Add Extra (on initial single card)
+  if (el.btnInitialAddExtra) {
+    el.btnInitialAddExtra.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (el.fileInput) el.fileInput.click();
+    });
+  }
+
+  // Button Add More Photos (on selected state)
+  if (el.btnAddMorePhotos) {
+    el.btnAddMorePhotos.addEventListener('click', function() {
+      if (state.photos.length >= 3) {
+        Swal.fire({
+          icon: 'info',
+          title: 'Maksimal 3 Foto',
+          text: 'Kamu sudah memilih batas maksimal 3 foto.',
+          confirmButtonColor: '#162b3d'
+        });
+        return;
+      }
+      if (el.slotInputExtra) el.slotInputExtra.click();
+    });
+  }
+
+  // Button Reset All Photos
+  if (el.btnResetAllPhotos) {
+    el.btnResetAllPhotos.addEventListener('click', function() {
+      state.photos = [];
+      state.activeCropIndex = 0;
+      state.activePreviewIndex = 0;
+      renderSelectedPhotosUI();
+    });
+  }
+
+  // Button Proceed to Crop
   if (el.btnProceedCrop) {
     el.btnProceedCrop.addEventListener('click', function() {
-      if (!state.photos[0].rawSrc) return;
+      if (state.photos.length === 0) return;
       openCropper(0);
     });
   }
 
+  // Drag & Drop on Dropzone Card
+  if (el.uploadDropzone) {
+    ['dragenter', 'dragover'].forEach(function(eventName) {
+      el.uploadDropzone.addEventListener(eventName, function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        el.uploadDropzone.classList.add('border-[#b69861]', 'bg-slate-50');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function(eventName) {
+      el.uploadDropzone.addEventListener(eventName, function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        el.uploadDropzone.classList.remove('border-[#b69861]', 'bg-slate-50');
+      });
+    });
+    el.uploadDropzone.addEventListener('drop', function(e) {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleIncomingFiles(Array.from(e.dataTransfer.files));
+      }
+    });
+  }
+
+  // Step 2: Cropper Tabs
   el.cropTabs.forEach(function(tab, idx) {
     if (tab) {
       tab.addEventListener('click', function() {
-        if (state.photos[idx].rawSrc) {
+        if (idx < state.photos.length) {
           saveCurrentCropperState();
           openCropper(idx);
         }
@@ -266,6 +327,7 @@ function bindEvents() {
     }
   });
 
+  // Cropper Controls
   if (el.zoomSlider) {
     el.zoomSlider.addEventListener('input', function(e) {
       if (state.cropper) {
@@ -299,23 +361,25 @@ function bindEvents() {
     });
   }
 
-  el.btnCropConfirm.addEventListener('click', confirmCropAndProceed);
-  el.btnReupload.addEventListener('click', backToUpload);
-  el.btnRecrop.addEventListener('click', backToCropper);
+  if (el.btnCropConfirm) el.btnCropConfirm.addEventListener('click', confirmCropAndProceed);
+  if (el.btnReupload) el.btnReupload.addEventListener('click', backToUpload);
+  if (el.btnRecrop) el.btnRecrop.addEventListener('click', backToCropper);
 
+  // Step 3: Preview Tabs
   el.previewTabs.forEach(function(tab, idx) {
     if (tab) {
       tab.addEventListener('click', function() {
-        if (state.photos[idx].croppedCanvas) {
+        if (idx < state.photos.length && state.photos[idx].croppedCanvas) {
           switchPreviewTab(idx);
         }
       });
     }
   });
 
-  el.btnPlayPause.addEventListener('click', togglePreviewPlayback);
-  el.btnReplay.addEventListener('click', restartPreviewPlayback);
+  if (el.btnPlayPause) el.btnPlayPause.addEventListener('click', togglePreviewPlayback);
+  if (el.btnReplay) el.btnReplay.addEventListener('click', restartPreviewPlayback);
 
+  // Download Handlers
   if (el.btnDownloadAllVideos) {
     el.btnDownloadAllVideos.addEventListener('click', function() {
       startBatchVideoExport(null);
@@ -341,6 +405,7 @@ function bindEvents() {
   }
 }
 
+// Wizard Step Navigation Indicator
 function setStep(step) {
   var p1 = document.getElementById('step-1-pill');
   var p2 = document.getElementById('step-2-pill');
@@ -352,60 +417,208 @@ function setStep(step) {
   }
 }
 
-function handleFileForSlot(slotIndex, file) {
+/* ============================================================
+ * PHOTO SELECTION & STEP 1 UI MANAGEMENT
+ * ============================================================ */
+function handleIncomingFiles(fileList) {
+  var validImageFiles = fileList.filter(function(f) {
+    return f.type.startsWith('image/');
+  });
+
+  if (validImageFiles.length === 0) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Format Salah',
+      text: 'Harap pilih file gambar yang valid (JPG, PNG, WEBP).',
+      confirmButtonColor: '#162b3d'
+    });
+    return;
+  }
+
+  var availableSlots = 3 - state.photos.length;
+  if (availableSlots <= 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Slot Penuh',
+      text: 'Maksimal 3 foto. Hapus salah satu foto jika ingin mengganti.',
+      confirmButtonColor: '#162b3d'
+    });
+    return;
+  }
+
+  var filesToAdd = validImageFiles.slice(0, availableSlots);
+  var loaded = 0;
+
+  filesToAdd.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      state.photos.push({
+        id: state.photos.length + 1,
+        rawSrc: e.target.result,
+        fileName: file.name,
+        croppedCanvas: null
+      });
+      loaded++;
+      if (loaded === filesToAdd.length) {
+        // Re-index photo IDs cleanly 1..N
+        reindexPhotos();
+        renderSelectedPhotosUI();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function replaceSinglePhoto(index, file) {
   if (!file.type.startsWith('image/')) {
-    Swal.fire({ icon: 'error', title: 'Format Salah', text: 'Harap pilih file gambar (JPG, PNG, WEBP).', confirmButtonColor: '#162b3d' });
+    Swal.fire({
+      icon: 'error',
+      title: 'Format Salah',
+      text: 'Harap pilih file gambar (JPG, PNG, WEBP).',
+      confirmButtonColor: '#162b3d'
+    });
     return;
   }
   var reader = new FileReader();
   reader.onload = function(e) {
-    state.photos[slotIndex].rawSrc = e.target.result;
-    state.photos[slotIndex].fileName = file.name;
-    state.photos[slotIndex].croppedCanvas = null;
-    updateSlotUI();
+    if (state.photos[index]) {
+      state.photos[index].rawSrc = e.target.result;
+      state.photos[index].fileName = file.name;
+      state.photos[index].croppedCanvas = null;
+      renderSelectedPhotosUI();
+    }
   };
   reader.readAsDataURL(file);
 }
 
-function removeSlot(slotIndex) {
-  state.photos[slotIndex].rawSrc = null;
-  state.photos[slotIndex].fileName = '';
-  state.photos[slotIndex].croppedCanvas = null;
-  el.slotInputs[slotIndex].value = '';
-  updateSlotUI();
+function removeSinglePhoto(index) {
+  state.photos.splice(index, 1);
+  reindexPhotos();
+  renderSelectedPhotosUI();
 }
 
-function updateSlotUI() {
-  var activeCount = 0;
+function reindexPhotos() {
   state.photos.forEach(function(photo, i) {
-    var num = i + 1;
-    var emptyDiv = document.getElementById('slot-empty-' + num);
-    var filledDiv = document.getElementById('slot-filled-' + num);
-    var thumbImg = document.getElementById('slot-thumb-' + num);
-    var nameSpan = document.getElementById('slot-name-' + num);
-
-    if (photo.rawSrc) {
-      activeCount++;
-      if (emptyDiv) emptyDiv.classList.add('hidden');
-      if (filledDiv) filledDiv.classList.remove('hidden');
-      if (thumbImg) thumbImg.src = photo.rawSrc;
-      if (nameSpan) nameSpan.textContent = photo.fileName || ('Foto ' + num);
-    } else {
-      if (emptyDiv) emptyDiv.classList.remove('hidden');
-      if (filledDiv) filledDiv.classList.add('hidden');
-      if (thumbImg) thumbImg.src = '';
-    }
+    photo.id = i + 1;
   });
+}
 
-  if (el.photoCountBadge) {
-    el.photoCountBadge.textContent = activeCount;
+function triggerReplaceDialog(index) {
+  state.replaceTargetIndex = index;
+  if (el.slotReplaceInput) el.slotReplaceInput.click();
+}
+
+function renderSelectedPhotosUI() {
+  var count = state.photos.length;
+
+  if (count === 0) {
+    // 1. Show Clean Initial Single Card
+    if (el.uploadInitialState) el.uploadInitialState.classList.remove('hidden');
+    if (el.uploadSelectedState) el.uploadSelectedState.classList.add('hidden');
+    return;
   }
-  if (el.btnProceedCrop) {
-    el.btnProceedCrop.disabled = !state.photos[0].rawSrc;
+
+  // 2. Show Selected Photos View
+  if (el.uploadInitialState) el.uploadInitialState.classList.add('hidden');
+  if (el.uploadSelectedState) el.uploadSelectedState.classList.remove('hidden');
+
+  if (el.photoCountBadge) el.photoCountBadge.textContent = count;
+  if (el.btnCropCount) el.btnCropCount.textContent = count;
+  if (el.remainingCountBadge) el.remainingCountBadge.textContent = 3 - count;
+
+  // Show / Hide "+ Tambah Foto" button in header
+  if (el.btnAddMorePhotos) {
+    if (count < 3) {
+      el.btnAddMorePhotos.classList.remove('hidden');
+    } else {
+      el.btnAddMorePhotos.classList.add('hidden');
+    }
+  }
+
+  // Render cards in selected-photos-grid
+  if (el.selectedPhotosGrid) {
+    el.selectedPhotosGrid.innerHTML = '';
+
+    state.photos.forEach(function(photo, idx) {
+      var isPrimary = idx === 0;
+      var card = document.createElement('div');
+      card.className = 'border border-slate-200 rounded p-3 bg-slate-50 flex items-center sm:flex-col sm:items-center text-left sm:text-center relative transition-all shadow-sm';
+
+      var badgeText = isPrimary ? 'Foto 1 (Utama)' : ('Foto ' + (idx + 1));
+      var badgeColor = isPrimary ? 'bg-[#162b3d] text-[#b69861]' : 'bg-slate-700 text-white';
+
+      card.innerHTML = `
+        <div class="relative w-16 h-20 sm:w-24 sm:h-28 flex-shrink-0 border border-slate-300 rounded overflow-hidden bg-black shadow-sm mr-3 sm:mr-0 sm:mb-2">
+          <img src="${photo.rawSrc}" class="w-full h-full object-cover">
+          <span class="absolute top-1 left-1 text-[9px] font-black px-1.5 py-0.5 rounded ${badgeColor} shadow">
+            #${idx + 1}
+          </span>
+        </div>
+        <div class="flex-1 min-w-0 sm:w-full">
+          <span class="block text-xs font-black text-[#162b3d] truncate mb-0.5">${badgeText}</span>
+          <span class="block text-[11px] text-slate-500 truncate mb-2 max-w-[140px] sm:max-w-none">${photo.fileName || ('foto_' + (idx + 1))}</span>
+          <div class="flex items-center space-x-1.5 sm:justify-center">
+            <button type="button" class="btn-card-replace text-[11px] font-bold text-[#162b3d] bg-white border border-slate-300 px-2.5 py-1 rounded hover:bg-slate-100 transition-all">
+              Ganti
+            </button>
+            ${!isPrimary ? `
+              <button type="button" class="btn-card-remove text-[11px] font-bold text-[#830106] bg-white border border-red-200 px-2 py-1 rounded hover:bg-red-50 transition-all">
+                Hapus
+              </button>
+            ` : `
+              <button type="button" class="btn-card-remove text-[11px] font-bold text-slate-400 bg-white border border-slate-200 px-2 py-1 rounded hover:bg-slate-100 transition-all" title="Hapus Foto">
+                &times;
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+
+      var btnReplace = card.querySelector('.btn-card-replace');
+      if (btnReplace) {
+        btnReplace.addEventListener('click', function(e) {
+          e.stopPropagation();
+          triggerReplaceDialog(idx);
+        });
+      }
+
+      var btnRemove = card.querySelector('.btn-card-remove');
+      if (btnRemove) {
+        btnRemove.addEventListener('click', function(e) {
+          e.stopPropagation();
+          removeSinglePhoto(idx);
+        });
+      }
+
+      el.selectedPhotosGrid.appendChild(card);
+    });
+
+    // If less than 3 photos, add an interactive dashed "+ Tambah Foto" slot
+    if (count < 3) {
+      var nextSlotNum = count + 1;
+      var addSlot = document.createElement('div');
+      addSlot.className = 'border-2 border-dashed border-slate-300 hover:border-[#b69861] p-3 text-center rounded bg-white flex flex-col items-center justify-center min-h-[120px] sm:min-h-[170px] cursor-pointer transition-all';
+      addSlot.innerHTML = `
+        <div class="w-9 h-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-black text-xs mb-1.5 border border-slate-200">
+          +
+        </div>
+        <span class="text-xs font-bold text-[#162b3d]">Tambah Foto ${nextSlotNum}</span>
+        <span class="text-[10px] text-slate-400 mt-0.5">Bisa sampai 3 foto</span>
+        <span class="mt-2 text-[11px] font-bold text-[#b69861] bg-white border border-[#b69861] px-2.5 py-0.5 rounded shadow-sm hover:bg-[#b69861] hover:text-white transition-all">+ Pilih</span>
+      `;
+      addSlot.addEventListener('click', function() {
+        if (el.slotInputExtra) el.slotInputExtra.click();
+      });
+      el.selectedPhotosGrid.appendChild(addSlot);
+    }
   }
 }
 
+/* ============================================================
+ * STEP 2: CROPPER SECTION
+ * ============================================================ */
 function openCropper(photoIndex) {
+  if (!state.photos[photoIndex]) return;
   state.activeCropIndex = photoIndex;
   setStep(2);
 
@@ -413,26 +626,31 @@ function openCropper(photoIndex) {
   el.previewSection.classList.add('hidden');
   el.cropperSection.classList.remove('hidden');
 
-  var totalActive = 0;
-  state.photos.forEach(function(photo, i) {
-    var tab = el.cropTabs[i];
-    if (tab) {
-      if (photo.rawSrc) {
-        totalActive++;
+  var totalActive = state.photos.length;
+
+  // Hide cropper tab bar if ONLY 1 photo
+  if (totalActive <= 1) {
+    if (el.cropperTabsContainer) el.cropperTabsContainer.classList.add('hidden');
+  } else {
+    if (el.cropperTabsContainer) el.cropperTabsContainer.classList.remove('hidden');
+    state.photos.forEach(function(photo, i) {
+      var tab = el.cropTabs[i];
+      if (tab) {
         tab.classList.remove('hidden');
         if (i === photoIndex) {
           tab.className = 'px-3 py-1.5 text-xs font-bold rounded flex items-center bg-[#162b3d] text-white shadow-sm';
         } else {
           tab.className = 'px-3 py-1.5 text-xs font-bold rounded flex items-center bg-slate-100 text-slate-700 hover:bg-slate-200';
         }
-      } else {
-        tab.classList.add('hidden');
       }
+    });
+    // Hide unused tabs
+    for (var j = totalActive; j < 3; j++) {
+      if (el.cropTabs[j]) el.cropTabs[j].classList.add('hidden');
     }
-  });
-
-  if (el.cropIndicatorText) {
-    el.cropIndicatorText.textContent = 'Mengatur Foto ' + (photoIndex + 1) + ' dari ' + totalActive;
+    if (el.cropIndicatorText) {
+      el.cropIndicatorText.textContent = 'Mengatur Foto ' + (photoIndex + 1) + ' dari ' + totalActive;
+    }
   }
 
   var targetPhoto = state.photos[photoIndex];
@@ -472,7 +690,7 @@ function openCropper(photoIndex) {
 }
 
 function saveCurrentCropperState() {
-  if (state.cropper && state.photos[state.activeCropIndex].rawSrc) {
+  if (state.cropper && state.photos[state.activeCropIndex]) {
     state.photos[state.activeCropIndex].croppedCanvas = state.cropper.getCroppedCanvas({
       width: state.canvasSize.width,
       height: state.canvasSize.height,
@@ -485,6 +703,7 @@ function saveCurrentCropperState() {
 function confirmCropAndProceed() {
   saveCurrentCropperState();
 
+  // Ensure every active photo has a croppedCanvas (fallback to cover draw if unadjusted)
   state.photos.forEach(function(photo) {
     if (photo.rawSrc && !photo.croppedCanvas) {
       var img = new Image();
@@ -520,31 +739,40 @@ function backToUpload() {
   el.cropperSection.classList.add('hidden');
   el.previewSection.classList.add('hidden');
   el.uploadDropzone.classList.remove('hidden');
+  renderSelectedPhotosUI();
 }
 
+/* ============================================================
+ * STEP 3: PREVIEW & DOWNLOAD SECTION
+ * ============================================================ */
 function setupPreviewAndDownloadUI() {
-  var filledCount = state.photos.filter(function(p) { return p.rawSrc; }).length;
+  var count = state.photos.length;
 
-  state.photos.forEach(function(photo, i) {
-    var tab = el.previewTabs[i];
-    if (tab) {
-      if (photo.rawSrc) {
-        tab.classList.remove('hidden');
-      } else {
-        tab.classList.add('hidden');
-      }
+  if (count <= 1) {
+    // 1 Photo: Clean Single Preview, Hide Multi-photo Tabs & Grid
+    if (el.previewTabsContainer) el.previewTabsContainer.classList.add('hidden');
+    if (el.individualDownloadGrid) el.individualDownloadGrid.classList.add('hidden');
+    if (el.btnDownloadAllText) el.btnDownloadAllText.textContent = 'Download Video Twibbon (MP4)';
+  } else {
+    // > 1 Photo: Show Multi-photo Tabs and Batch Download
+    if (el.previewTabsContainer) el.previewTabsContainer.classList.remove('hidden');
+    if (el.individualDownloadGrid) el.individualDownloadGrid.classList.remove('hidden');
+    if (el.btnDownloadAllText) {
+      el.btnDownloadAllText.textContent = 'Download Semua Video Sekaligus (' + count + ' Video MP4)';
     }
-  });
 
-  if (el.btnDownloadAllText) {
-    el.btnDownloadAllText.textContent = filledCount > 1 
-      ? ('Download Semua Video Sekaligus (' + filledCount + ' Video MP4)') 
-      : 'Download Video Twibbon (MP4)';
+    state.photos.forEach(function(photo, i) {
+      var tab = el.previewTabs[i];
+      if (tab) tab.classList.remove('hidden');
+    });
+    for (var j = count; j < 3; j++) {
+      if (el.previewTabs[j]) el.previewTabs[j].classList.add('hidden');
+    }
+
+    if (el.btnDlVideo1) el.btnDlVideo1.style.display = count >= 1 ? 'block' : 'none';
+    if (el.btnDlVideo2) el.btnDlVideo2.style.display = count >= 2 ? 'block' : 'none';
+    if (el.btnDlVideo3) el.btnDlVideo3.style.display = count >= 3 ? 'block' : 'none';
   }
-
-  if (el.btnDlVideo1) el.btnDlVideo1.style.display = state.photos[0].rawSrc ? 'block' : 'none';
-  if (el.btnDlVideo2) el.btnDlVideo2.style.display = state.photos[1].rawSrc ? 'block' : 'none';
-  if (el.btnDlVideo3) el.btnDlVideo3.style.display = state.photos[2].rawSrc ? 'block' : 'none';
 }
 
 function switchPreviewTab(index) {
@@ -618,7 +846,9 @@ function togglePreviewPlayback() {
   }
 }
 
-function restartPreviewPlayback() { startPreviewPlayer(); }
+function restartPreviewPlayback() {
+  startPreviewPlayer();
+}
 
 function stopPreviewPlayer() {
   previewState.isPlaying = false;
@@ -690,21 +920,26 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 }
 
 /* ============================================================
- * VIDEO EXPORT ENGINE (Multi-Video Batch or Single)
+ * HIGH-CONCURRENCY SERVER VIDEO EXPORT (Single or Batch)
  * ============================================================ */
-async function startBatchVideoExport(specificSlot) {
+async function startBatchVideoExport(specificIndex) {
   if (state.isRendering) return;
 
   var targets = [];
-  if (specificSlot !== null && specificSlot !== undefined) {
-    var p = state.photos[specificSlot];
+  if (specificIndex !== null && specificIndex !== undefined) {
+    var p = state.photos[specificIndex];
     if (p && p.croppedCanvas) targets.push(p);
   } else {
     targets = state.photos.filter(function(p) { return p.rawSrc && p.croppedCanvas; });
   }
 
   if (targets.length === 0) {
-    Swal.fire({ icon: 'warning', title: 'Belum Ada Foto', text: 'Silakan upload dan atur posisi foto terlebih dahulu.', confirmButtonColor: '#162b3d' });
+    Swal.fire({
+      icon: 'warning',
+      title: 'Belum Ada Foto',
+      text: 'Silakan upload dan atur posisi foto terlebih dahulu.',
+      confirmButtonColor: '#162b3d'
+    });
     return;
   }
 
