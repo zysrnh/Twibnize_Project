@@ -152,15 +152,60 @@ function loadFirstAvailableImage(candidates, index) {
       state.renderCanvas.height = state.canvasSize.height;
     }
 
+    // Auto Chroma Key (Hapus Green Screen Otomatis)
+    state.processedFrameCanvas = applyChromaKey(testImg);
+    const transparentFrameDataUrl = state.processedFrameCanvas.toDataURL();
+
     if (el.cropperFrameOverlay) {
-      el.cropperFrameOverlay.src = candidates[index];
+      el.cropperFrameOverlay.src = transparentFrameDataUrl;
     }
     
-    console.log(`Menggunakan frame twibbon: ${candidates[index]} (${state.canvasSize.width}x${state.canvasSize.height}, rasio: ${state.aspectRatio.toFixed(2)})`);
+    console.log(`Menggunakan frame twibbon: ${candidates[index]} (${state.canvasSize.width}x${state.canvasSize.height}, rasio: ${state.aspectRatio.toFixed(2)}) dengan Auto Green-Screen Removal.`);
   };
   testImg.onerror = () => {
     loadFirstAvailableImage(candidates, index + 1);
   };
+}
+
+/**
+ * Auto Chroma Key Algorithm (Menghilangkan Warna Hijau Neon)
+ */
+function applyChromaKey(sourceImage) {
+  const c = document.createElement('canvas');
+  c.width = sourceImage.naturalWidth || sourceImage.width || 1080;
+  c.height = sourceImage.naturalHeight || sourceImage.height || 1080;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(sourceImage, 0, 0, c.width, c.height);
+
+  try {
+    const imgData = ctx.getImageData(0, 0, c.width, c.height);
+    const data = imgData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Deteksi warna hijau green-screen:
+      // Green dominan dibanding Red dan Blue
+      const maxRB = Math.max(r, b);
+      if (g > 70 && g > maxRB * 1.25) {
+        const diff = g - maxRB;
+        if (diff > 35) {
+          data[i + 3] = 0; // Transparan 100%
+        } else {
+          // Semi-transparan di tepian (anti-aliasing halus)
+          data[i + 3] = Math.round(255 * (1 - (diff / 35)));
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  } catch (e) {
+    console.warn('Gagal membaca pixel untuk chroma key (CORS/tainted canvas):', e);
+  }
+
+  return c;
 }
 
 function loadFirstAvailableVideo(candidates, index) {
@@ -312,11 +357,13 @@ function bindEvents() {
         const url = URL.createObjectURL(file);
         state.frameImg.src = url;
         state.frameImg.onload = () => {
-          if (el.cropperFrameOverlay) el.cropperFrameOverlay.src = url;
+          state.processedFrameCanvas = applyChromaKey(state.frameImg);
+          const transparentUrl = state.processedFrameCanvas.toDataURL();
+          if (el.cropperFrameOverlay) el.cropperFrameOverlay.src = transparentUrl;
           Swal.fire({
             icon: 'success',
             title: 'Frame Twibbon Diganti',
-            text: `Menggunakan frame: ${file.name}`,
+            text: `Menggunakan frame: ${file.name} (Auto Green-Screen Hilang)`,
             confirmButtonColor: '#1e40af'
           });
         };
@@ -590,9 +637,9 @@ function renderFrameToCanvas(ctx, time, introDuration) {
       ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
     }
 
-    // 2. Draw Twibbon Frame Overlay (SVG)
+    // 2. Draw Twibbon Frame Overlay (dengan green screen yang sudah dihilangkan)
     if (state.isFrameLoaded) {
-      ctx.drawImage(state.frameImg, 0, 0, width, height);
+      ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
     }
 
     // 3. Subtle flat intro pop effect when photo first appears
@@ -806,7 +853,7 @@ function exportStaticPhoto() {
 
   // 2. Draw Frame
   if (state.isFrameLoaded) {
-    ctx.drawImage(state.frameImg, 0, 0, exportCanvas.width, exportCanvas.height);
+    ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, exportCanvas.width, exportCanvas.height);
   }
 
   // Export to Blob
