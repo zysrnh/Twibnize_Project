@@ -1,12 +1,6 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
  * v8.0 - Multi-Photo (1-3 Videos) + High-Concurrency Server Engine
- * 
- * Fitur Unggulan:
- * - Dukungan 1 s/d 3 Foto Mahasiswa Baru sekaligus.
- * - Render 1 s/d 3 Video MP4 High Definition (1080x1350 @ 30fps).
- * - Server Queue Locking (Anti-Server Down di shared hosting cPanel).
- * - Fallback cerdas ke browser jika koneksi terganggu.
  */
 
 // Global App State
@@ -216,7 +210,6 @@ function loadFirstAvailableVideo(candidates, index) {
 
 // Event Bindings
 function bindEvents() {
-  // Individual Slot File Inputs
   el.slotInputs.forEach(function(input, idx) {
     if (input) {
       input.addEventListener('change', function(e) {
@@ -227,7 +220,6 @@ function bindEvents() {
     }
   });
 
-  // Multi-File Input (Pilih Sekaligus)
   if (el.fileInput) {
     el.fileInput.addEventListener('change', function(e) {
       if (e.target.files && e.target.files.length > 0) {
@@ -239,7 +231,6 @@ function bindEvents() {
     });
   }
 
-  // Change / Remove Buttons for slots
   [1, 2, 3].forEach(function(num) {
     var btnChange = document.getElementById('btn-change-slot-' + num);
     var btnRemove = document.getElementById('btn-remove-slot-' + num);
@@ -257,7 +248,6 @@ function bindEvents() {
     }
   });
 
-  // Proceed to Cropper
   if (el.btnProceedCrop) {
     el.btnProceedCrop.addEventListener('click', function() {
       if (!state.photos[0].rawSrc) return;
@@ -265,7 +255,6 @@ function bindEvents() {
     });
   }
 
-  // Cropper Tabs
   el.cropTabs.forEach(function(tab, idx) {
     if (tab) {
       tab.addEventListener('click', function() {
@@ -277,7 +266,6 @@ function bindEvents() {
     }
   });
 
-  // Zoom & Rotate Controls
   if (el.zoomSlider) {
     el.zoomSlider.addEventListener('input', function(e) {
       if (state.cropper) {
@@ -311,12 +299,10 @@ function bindEvents() {
     });
   }
 
-  // Cropper Action Buttons
   el.btnCropConfirm.addEventListener('click', confirmCropAndProceed);
   el.btnReupload.addEventListener('click', backToUpload);
   el.btnRecrop.addEventListener('click', backToCropper);
 
-  // Preview Tabs
   el.previewTabs.forEach(function(tab, idx) {
     if (tab) {
       tab.addEventListener('click', function() {
@@ -327,29 +313,27 @@ function bindEvents() {
     }
   });
 
-  // Preview Player Controls
   el.btnPlayPause.addEventListener('click', togglePreviewPlayback);
   el.btnReplay.addEventListener('click', restartPreviewPlayback);
 
-  // Download Action Buttons
   if (el.btnDownloadAllVideos) {
     el.btnDownloadAllVideos.addEventListener('click', function() {
-      startBatchVideoExport(null); // Render semua video
+      startBatchVideoExport(null);
     });
   }
   if (el.btnDlVideo1) {
     el.btnDlVideo1.addEventListener('click', function() {
-      startBatchVideoExport(0); // Hanya Foto 1
+      startBatchVideoExport(0);
     });
   }
   if (el.btnDlVideo2) {
     el.btnDlVideo2.addEventListener('click', function() {
-      startBatchVideoExport(1); // Hanya Foto 2
+      startBatchVideoExport(1);
     });
   }
   if (el.btnDlVideo3) {
     el.btnDlVideo3.addEventListener('click', function() {
-      startBatchVideoExport(2); // Hanya Foto 3
+      startBatchVideoExport(2);
     });
   }
   if (el.btnDownloadPhoto) {
@@ -357,7 +341,6 @@ function bindEvents() {
   }
 }
 
-// Wizard Step Navigation
 function setStep(step) {
   var p1 = document.getElementById('step-1-pill');
   var p2 = document.getElementById('step-2-pill');
@@ -369,7 +352,6 @@ function setStep(step) {
   }
 }
 
-// Handle Photo Files for Slots
 function handleFileForSlot(slotIndex, file) {
   if (!file.type.startsWith('image/')) {
     Swal.fire({ icon: 'error', title: 'Format Salah', text: 'Harap pilih file gambar (JPG, PNG, WEBP).', confirmButtonColor: '#162b3d' });
@@ -379,7 +361,7 @@ function handleFileForSlot(slotIndex, file) {
   reader.onload = function(e) {
     state.photos[slotIndex].rawSrc = e.target.result;
     state.photos[slotIndex].fileName = file.name;
-    state.photos[slotIndex].croppedCanvas = null; // reset crop
+    state.photos[slotIndex].croppedCanvas = null;
     updateSlotUI();
   };
   reader.readAsDataURL(file);
@@ -419,12 +401,10 @@ function updateSlotUI() {
     el.photoCountBadge.textContent = activeCount;
   }
   if (el.btnProceedCrop) {
-    // Foto 1 wajib diisi untuk lanjut
     el.btnProceedCrop.disabled = !state.photos[0].rawSrc;
   }
 }
 
-// Cropper Operations
 function openCropper(photoIndex) {
   state.activeCropIndex = photoIndex;
   setStep(2);
@@ -433,7 +413,6 @@ function openCropper(photoIndex) {
   el.previewSection.classList.add('hidden');
   el.cropperSection.classList.remove('hidden');
 
-  // Update tabs visibility & active state
   var totalActive = 0;
   state.photos.forEach(function(photo, i) {
     var tab = el.cropTabs[i];
@@ -456,7 +435,6 @@ function openCropper(photoIndex) {
     el.cropIndicatorText.textContent = 'Mengatur Foto ' + (photoIndex + 1) + ' dari ' + totalActive;
   }
 
-  // Load target photo to cropper
   var targetPhoto = state.photos[photoIndex];
   el.cropperImage.src = targetPhoto.rawSrc;
 
@@ -507,10 +485,8 @@ function saveCurrentCropperState() {
 function confirmCropAndProceed() {
   saveCurrentCropperState();
 
-  // Pastikan semua foto yang di-upload sudah memiliki croppedCanvas
   state.photos.forEach(function(photo) {
     if (photo.rawSrc && !photo.croppedCanvas) {
-      // Jika belum sempat dibuka tabnya, buat canvas default
       var img = new Image();
       img.src = photo.rawSrc;
       var c = document.createElement('canvas');
@@ -546,11 +522,9 @@ function backToUpload() {
   el.uploadDropzone.classList.remove('hidden');
 }
 
-// Preview & Download Operations
 function setupPreviewAndDownloadUI() {
   var filledCount = state.photos.filter(function(p) { return p.rawSrc; }).length;
 
-  // Setup Preview Tabs
   state.photos.forEach(function(photo, i) {
     var tab = el.previewTabs[i];
     if (tab) {
@@ -562,7 +536,6 @@ function setupPreviewAndDownloadUI() {
     }
   });
 
-  // Setup Download Buttons
   if (el.btnDownloadAllText) {
     el.btnDownloadAllText.textContent = filledCount > 1 
       ? ('Download Semua Video Sekaligus (' + filledCount + ' Video MP4)') 
@@ -590,9 +563,6 @@ function switchPreviewTab(index) {
   startPreviewPlayer();
 }
 
-/* ============================================================
- * PREVIEW ANIMATION ENGINE
- * ============================================================ */
 var previewState = {
   isPlaying: false,
   currentTime: 0,
@@ -758,7 +728,6 @@ async function startBatchVideoExport(specificSlot) {
     try {
       await renderSinglePhotoVideo(photo, currentNum, total);
       successCount++;
-      // Jeda 500ms antar video agar browser & server bernapas
       if (i < total - 1) {
         await new Promise(function(r) { setTimeout(r, 500); });
       }
@@ -799,7 +768,6 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
   return new Promise(function(resolve, reject) {
     updateExportProgress(5, 'Menyiapkan gambar twibbon (Foto ' + photo.id + ')...');
 
-    // Buat canvas komposit 1080x1350
     var exportCanvas = document.createElement('canvas');
     exportCanvas.width = state.canvasSize.width;
     exportCanvas.height = state.canvasSize.height;
@@ -811,7 +779,6 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
       ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, exportCanvas.width, exportCanvas.height);
     }
 
-    // Export sebagai JPEG kualitas 0.95 (~500KB)
     exportCanvas.toBlob(async function(blob) {
       if (!blob) {
         return reject(new Error('Gagal membuat blob gambar'));
