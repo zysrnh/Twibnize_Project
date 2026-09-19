@@ -1,0 +1,55 @@
+# =======================================================================
+# Konfigurasi Apache / LiteSpeed untuk cPanel (Twibbon Video Generator)
+# =======================================================================
+
+# 1. Pastikan MIME Types Terdaftar dengan Benar
+<IfModule mod_mime.c>
+    AddType video/mp4 .mp4
+    AddType video/webm .webm
+    AddType image/svg+xml .svg .svgz
+    AddType image/png .png
+    AddType image/jpeg .jpg .jpeg
+    AddType text/css .css
+    AddType application/javascript .js
+</IfModule>
+
+# 2. Dukungan Streaming Video MP4 di Browser HP (Byte-Ranges Support)
+<IfModule mod_headers.c>
+    <FilesMatch "\.(mp4|webm)$">
+        Header set Accept-Ranges bytes
+        Header set Cache-Control "public, max-age=2592000, immutable"
+    </FilesMatch>
+    
+    <FilesMatch "\.(svg|png|jpg|jpeg|css|js)$">
+        Header set Cache-Control "public, max-age=2592000, immutable"
+    </FilesMatch>
+
+    # Security Headers
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# 3. Gzip / Deflate Compression (Mempercepat Loading di HP)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+
+# 4. Browser Caching (Expires Headers)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 1 month"
+    ExpiresByType text/html "access plus 1 hour"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType video/mp4 "access plus 1 month"
+    ExpiresByType video/webm "access plus 1 month"
+</IfModule>
+
+# 5. Nonaktifkan Directory Browsing (Keamanan Folder)
+Options -Indexes

@@ -90,20 +90,32 @@ function initCanvases() {
  * Load Initial Assets (SVG Frame and Intro Video)
  */
 function loadDefaultAssets() {
-  // 1. Try to load twibon.svg (or assets/frame.svg)
+  // 1. Try to load twibon.svg from assets/images/
   state.frameImg.crossOrigin = 'anonymous';
   
-  // Deteksi file twibon.svg yang sudah ada di root atau assets
-  const frameCandidates = ['twibon.svg', 'assets/frame.svg', 'assets/twibon.svg', 'assets/frame.png'];
+  const frameCandidates = [
+    'assets/images/twibon.svg',
+    'assets/twibon.svg',
+    'twibon.svg',
+    'assets/images/frame.png',
+    'assets/frame.png'
+  ];
   loadFirstAvailableImage(frameCandidates, 0);
 
-  // 2. Try to load Framenaur.mp4 (or frame.mp4)
+  // 2. Try to load Framenaur.mp4 from assets/videos/
   state.introVideo.crossOrigin = 'anonymous';
   state.introVideo.playsInline = true;
   state.introVideo.muted = false;
   state.introVideo.preload = 'auto';
   
-  const videoCandidates = ['Framenaur.mp4', 'frame.mp4', 'assets/Framenaur.mp4', 'assets/intro.mp4', 'assets/frame.mp4', 'intro.mp4'];
+  const videoCandidates = [
+    'assets/videos/Framenaur.mp4',
+    'assets/Framenaur.mp4',
+    'Framenaur.mp4',
+    'assets/videos/frame.mp4',
+    'assets/frame.mp4',
+    'frame.mp4'
+  ];
   loadFirstAvailableVideo(videoCandidates, 0);
 }
 
