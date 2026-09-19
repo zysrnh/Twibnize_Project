@@ -641,22 +641,45 @@ function updatePreviewUI() {
 function renderFrameToCanvas(ctx, time, introDuration) {
   const width = state.canvasSize.width;
   const height = state.canvasSize.height;
+  const crossfadeDuration = 0.55; // 0.55 detik transisi crossfade halus
 
   // Clear canvas
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, width, height);
 
-  if (time < introDuration) {
-    // PHASE 1: INTRO ANIMATION / VIDEO
+  const fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
+
+  if (time < fadeStartTime) {
+    // PHASE 1: FULL INTRO VIDEO
     if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
-      // Draw actual MP4 video frame
       ctx.drawImage(state.introVideo, 0, 0, width, height);
     } else {
-      // Draw Built-in Procedural Flat Intro Animation
       drawProceduralIntro(ctx, time, introDuration, width, height);
     }
+  } else if (time >= fadeStartTime && time < introDuration) {
+    // PHASE 1.5: MAGICAL STARBURST CROSSFADE (Transisi Bintang Emas)
+    // 1. Gambar Video Frame (Ledakan Sihir Bintang Emas)
+    if (state.hasCustomVideo && state.introVideo.readyState >= 2) {
+      ctx.drawImage(state.introVideo, 0, 0, width, height);
+    } else {
+      drawProceduralIntro(ctx, time, introDuration, width, height);
+    }
+
+    // 2. Blend Twibbon + Foto Maba muncul dari balik kilau bintang
+    const progress = (time - fadeStartTime) / crossfadeDuration;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, Math.max(0, progress));
+
+    if (state.croppedCanvas) {
+      ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
+    }
+    if (state.isFrameLoaded) {
+      ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, width, height);
+    }
+
+    ctx.restore();
   } else {
-    // PHASE 2: TWIBBON + CROPPED USER PHOTO
+    // PHASE 2: FULL TWIBBON + FOTO MABA
     // 1. Draw Cropped Photo
     if (state.croppedCanvas) {
       ctx.drawImage(state.croppedCanvas, 0, 0, width, height);
