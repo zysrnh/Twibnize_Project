@@ -97,13 +97,13 @@ function loadDefaultAssets() {
   const frameCandidates = ['twibon.svg', 'assets/frame.svg', 'assets/twibon.svg', 'assets/frame.png'];
   loadFirstAvailableImage(frameCandidates, 0);
 
-  // 2. Try to load frame.mp4 (or assets/intro.mp4)
+  // 2. Try to load Framenaur.mp4 (or frame.mp4)
   state.introVideo.crossOrigin = 'anonymous';
   state.introVideo.playsInline = true;
   state.introVideo.muted = false;
   state.introVideo.preload = 'auto';
   
-  const videoCandidates = ['frame.mp4', 'assets/intro.mp4', 'assets/frame.mp4', 'intro.mp4'];
+  const videoCandidates = ['Framenaur.mp4', 'frame.mp4', 'assets/Framenaur.mp4', 'assets/intro.mp4', 'assets/frame.mp4', 'intro.mp4'];
   loadFirstAvailableVideo(videoCandidates, 0);
 }
 
