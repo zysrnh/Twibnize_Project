@@ -8,7 +8,7 @@
   --color-accent-dark: #9f8350;
   --color-danger: #830106;     /* Merah LPKIA */
   --color-danger-dark: #6b0004;
-  --color-bg: #f4f6f8;
+  --color-bg: #f8fafc;
   --color-surface: #ffffff;
   --color-text-main: #0f172a;
   --color-text-muted: #64748b;
@@ -31,7 +31,7 @@ body {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  animation: popIn 0.25s ease-out;
+  animation: popIn 0.2s ease-out;
 }
 
 .flat-btn {
@@ -195,6 +195,48 @@ body {
   transition: width 0.1s linear;
 }
 
+/* Watermark Floating Badge */
+.wm-badge {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  space-x: 6px;
+  background-color: #162b3d;
+  color: #ffffff;
+  border: 1px solid rgba(182, 152, 97, 0.6);
+  padding: 5px 10px;
+  border-radius: 9999px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+}
+
+.wm-badge:hover {
+  transform: translateY(-2px);
+  background-color: #0f1f2d;
+  border-color: #b69861;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.28);
+}
+
+.wm-badge .wm-logo {
+  width: 18px;
+  height: 18px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  padding: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  overflow: hidden;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -215,7 +257,7 @@ body {
 @keyframes popIn {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
   to {
     opacity: 1;
