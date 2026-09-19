@@ -87,41 +87,106 @@ function initCanvases() {
 }
 
 /**
- * Load Initial Assets (frame.svg and intro.mp4)
+ * Load Initial Assets (SVG Frame and Intro Video)
  */
 function loadDefaultAssets() {
-  // 1. Load SVG Frame
+  // 1. Try to load twibon.svg (or assets/frame.svg)
   state.frameImg.crossOrigin = 'anonymous';
-  state.frameImg.src = 'assets/frame.svg';
-  state.frameImg.onload = () => {
-    state.isFrameLoaded = true;
-    if (el.cropperFrameOverlay) {
-      el.cropperFrameOverlay.src = state.frameImg.src;
-    }
-  };
-  state.frameImg.onerror = () => {
-    console.warn('File assets/frame.svg belum ditemukan, menggunakan fallback frame.');
-    createFallbackFrame();
-  };
+  
+  // Deteksi file twibon.svg yang sudah ada di root atau assets
+  const frameCandidates = ['twibon.svg', 'assets/frame.svg', 'assets/twibon.svg', 'assets/frame.png'];
+  loadFirstAvailableImage(frameCandidates, 0);
 
-  // 2. Load Intro Video
+  // 2. Try to load frame.mp4 (or assets/intro.mp4)
   state.introVideo.crossOrigin = 'anonymous';
   state.introVideo.playsInline = true;
   state.introVideo.muted = false;
   state.introVideo.preload = 'auto';
-  state.introVideo.src = 'assets/intro.mp4';
+  
+  const videoCandidates = ['frame.mp4', 'assets/intro.mp4', 'assets/frame.mp4', 'intro.mp4'];
+  loadFirstAvailableVideo(videoCandidates, 0);
+}
 
-  state.introVideo.onloadedmetadata = () => {
-    state.isVideoLoaded = true;
-    state.hasCustomVideo = true;
-    updateVideoStatusBadge(true, `Video Intro Siap (${state.introVideo.duration.toFixed(1)}s)`);
+function loadFirstAvailableImage(candidates, index) {
+  if (index >= candidates.length) {
+    console.warn('File frame twibbon tidak ditemukan, menggunakan fallback.');
+    createFallbackFrame();
+    return;
+  }
+  
+  const testImg = new Image();
+  testImg.crossOrigin = 'anonymous';
+  testImg.src = candidates[index];
+  testImg.onload = () => {
+    state.frameImg.src = candidates[index];
+    state.isFrameLoaded = true;
+    
+    // Auto-detect aspect ratio dari frame SVG/PNG
+    const naturalW = testImg.naturalWidth || testImg.width || 1080;
+    const naturalH = testImg.naturalHeight || testImg.height || 1080;
+    state.aspectRatio = naturalW / naturalH;
+    
+    // Set resolusi render HD optimal sesuai rasio
+    if (Math.abs(state.aspectRatio - 1) < 0.05) {
+      // 1:1 Square
+      state.canvasSize = { width: 1080, height: 1080 };
+    } else if (state.aspectRatio < 0.9) {
+      // Portrait / 4:5 / 9:16 (Story / Feed Vertikal)
+      const targetW = 1080;
+      const targetH = Math.round(targetW / state.aspectRatio);
+      state.canvasSize = { width: targetW, height: targetH };
+    } else {
+      // Landscape
+      const targetH = 1080;
+      const targetW = Math.round(targetH * state.aspectRatio);
+      state.canvasSize = { width: targetW, height: targetH };
+    }
+    
+    // Update dimensi canvas preview & render
+    if (state.previewCanvas) {
+      state.previewCanvas.width = state.canvasSize.width;
+      state.previewCanvas.height = state.canvasSize.height;
+    }
+    if (state.renderCanvas) {
+      state.renderCanvas.width = state.canvasSize.width;
+      state.renderCanvas.height = state.canvasSize.height;
+    }
+
+    if (el.cropperFrameOverlay) {
+      el.cropperFrameOverlay.src = candidates[index];
+    }
+    
+    console.log(`Menggunakan frame twibbon: ${candidates[index]} (${state.canvasSize.width}x${state.canvasSize.height}, rasio: ${state.aspectRatio.toFixed(2)})`);
   };
+  testImg.onerror = () => {
+    loadFirstAvailableImage(candidates, index + 1);
+  };
+}
 
-  state.introVideo.onerror = () => {
-    console.info('File assets/intro.mp4 belum ada, sistem akan menggunakan generator animasi intro built-in.');
+function loadFirstAvailableVideo(candidates, index) {
+  if (index >= candidates.length) {
+    console.info('Video MP4 kustom belum ada, sistem menggunakan generator animasi intro demo.');
     state.isVideoLoaded = true;
     state.hasCustomVideo = false;
     updateVideoStatusBadge(false, 'Mode Demo (Animasi Intro Bawaan)');
+    return;
+  }
+
+  const vSrc = candidates[index];
+  const testVid = document.createElement('video');
+  testVid.crossOrigin = 'anonymous';
+  testVid.src = vSrc;
+
+  testVid.onloadedmetadata = () => {
+    state.introVideo.src = vSrc;
+    state.isVideoLoaded = true;
+    state.hasCustomVideo = true;
+    updateVideoStatusBadge(true, `Video Siap (${vSrc} - ${testVid.duration.toFixed(1)}s)`);
+    console.log(`Menggunakan video: ${vSrc}`);
+  };
+
+  testVid.onerror = () => {
+    loadFirstAvailableVideo(candidates, index + 1);
   };
 }
 
@@ -302,11 +367,17 @@ function openCropper(imageSrc) {
     state.cropper.destroy();
   }
 
+  // Update cropper container aspect-ratio
+  const cropperContainer = el.cropperImage.parentElement;
+  if (cropperContainer) {
+    cropperContainer.style.aspectRatio = `${state.canvasSize.width} / ${state.canvasSize.height}`;
+  }
+
   state.cropper = new Cropper(el.cropperImage, {
-    aspectRatio: 1, // 1:1 Square
+    aspectRatio: state.aspectRatio || 1,
     viewMode: 1,
     dragMode: 'move',
-    autoCropArea: 0.9,
+    autoCropArea: 0.95,
     restore: false,
     guides: true,
     center: true,
@@ -328,11 +399,16 @@ function confirmCropAndProceed() {
 
   // Dapatkan hasil crop dengan resolusi tajam
   state.croppedCanvas = state.cropper.getCroppedCanvas({
-    width: 1080,
-    height: 1080,
+    width: state.canvasSize.width,
+    height: state.canvasSize.height,
     imageSmoothingEnabled: true,
     imageSmoothingQuality: 'high'
   });
+
+  // Update preview canvas aspect ratio
+  if (state.previewCanvas && state.previewCanvas.parentElement) {
+    state.previewCanvas.parentElement.style.aspectRatio = `${state.canvasSize.width} / ${state.canvasSize.height}`;
+  }
 
   el.cropperSection.classList.add('hidden');
   el.previewSection.classList.remove('hidden');
