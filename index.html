@@ -42,7 +42,7 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <!-- Custom Flat CSS -->
-  <link rel="stylesheet" href="assets/css/style.css?v=9.5">
+  <link rel="stylesheet" href="assets/css/style.css?v=9.6">
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between select-none font-sans">
 
@@ -79,7 +79,7 @@
       <div class="w-8 sm:w-16 h-[2px] bg-slate-200"></div>
       <div id="step-3-pill" class="step-item">
         <span class="step-badge">3</span>
-        <span>Download</span>
+        <span>Preview &amp; Download</span>
       </div>
     </div>
   </div>
@@ -143,7 +143,6 @@
             <p class="text-[11px] text-slate-500">Foto siap diatur posisinya untuk twibbon video.</p>
           </div>
 
-          <!-- Button Tambah Foto -->
           <div class="flex items-center">
             <button type="button" id="btn-add-more-photos" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs font-bold text-[#162b3d] border-[#b69861] hover:bg-[#b69861] hover:text-white whitespace-nowrap">
               <svg class="w-3.5 h-3.5 mr-1 text-[#b69861] inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -198,7 +197,7 @@
         <span class="text-[11px] text-slate-400 ml-auto font-medium" id="crop-indicator-text">Mengatur Foto 1</span>
       </div>
 
-      <!-- CROPPER VIEWPORT (Full Twibbonize Free Move 4:5) -->
+      <!-- CROPPER VIEWPORT -->
       <div class="relative w-full aspect-[4/5] bg-[#0f172a] overflow-hidden border-2 border-[#162b3d] mb-2 max-w-[420px] mx-auto cursor-grab active:cursor-grabbing rounded">
         <img id="cropper-image" src="" alt="Cropper Target" class="max-w-full block">
         <img id="cropper-frame-overlay" src="assets/images/twibon.svg" alt="Frame Guide" class="crop-frame-guide">
@@ -211,7 +210,6 @@
 
       <!-- ZOOM SLIDER & TOOLBAR -->
       <div class="max-w-[420px] mx-auto bg-slate-50 border border-slate-200 p-2.5 rounded mb-3">
-        <!-- Zoom Slider -->
         <div class="flex items-center space-x-3 mb-2">
           <span class="text-xs font-bold text-[#162b3d] flex items-center min-w-[55px]">
             <svg class="w-4 h-4 mr-1 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,7 +221,6 @@
           <span id="zoom-level-text" class="text-xs font-extrabold text-[#162b3d] min-w-[40px] text-right">100%</span>
         </div>
 
-        <!-- Quick Rotate & Reset Buttons -->
         <div class="flex items-center justify-between pt-2 border-t border-slate-200">
           <div class="space-x-1.5">
             <button id="btn-rotate-left" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
@@ -256,12 +253,15 @@
       </div>
     </div>
 
-    <!-- STEP 3: PREVIEW & DOWNLOAD SECTION (Hidden by default) -->
+    <!-- STEP 3: PREVIEW & DOWNLOAD SECTION -->
     <div id="preview-section" class="hidden flat-card p-3 sm:p-5 bg-white">
       <div class="flex items-center justify-between border-b border-slate-200 pb-2.5 mb-3">
         <div>
-          <h2 class="font-extrabold text-[#162b3d] text-sm sm:text-base">Hasil Video Twibbon</h2>
-          <p class="text-[11px] text-slate-500">Video intro diputar lebih dulu, lalu bersambung ke foto twibbonmu</p>
+          <div class="flex items-center gap-2 mb-0.5">
+            <h2 class="font-extrabold text-[#162b3d] text-sm sm:text-base">Preview Hasil Video</h2>
+            <span class="bg-[#b69861] text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">PREVIEW</span>
+          </div>
+          <p class="text-[11px] text-slate-500">Simulasi video sebelum diexport (intro sihir &amp; foto twibbon)</p>
         </div>
         <button id="btn-recrop" class="flat-btn flat-btn-outline px-2.5 py-1 text-xs">
           Atur Ulang Foto
@@ -281,7 +281,7 @@
         </button>
       </div>
 
-      <!-- CANVAS PREVIEW CONTAINER (4:5 Ratio) -->
+      <!-- CANVAS PREVIEW CONTAINER -->
       <div class="canvas-preview-container mb-2.5">
         <canvas id="preview-canvas"></canvas>
       </div>
@@ -341,6 +341,14 @@
           </svg>
           Download Foto Twibbon Saja (PNG)
         </button>
+
+        <!-- HELP / SUPPORT BANNER -->
+        <div class="bg-amber-50 border border-amber-200 rounded p-3 text-center mt-2 shadow-sm">
+          <p class="text-xs text-amber-900 leading-relaxed font-medium">
+            ⚠️ <b>Punya kendala lag / patah-patah ketika export?</b><br>
+            Silakan hubungi: <a href="https://wa.me/6283861669565?text=Halo%20min,%20saya%20mengalami%20kendala%20saat%20export%20video%20twibbon" target="_blank" class="text-[#830106] font-extrabold underline hover:text-[#b69861]">083861669565 (WhatsApp)</a>
+          </p>
+        </div>
       </div>
     </div>
 
@@ -357,7 +365,14 @@
         <div id="processing-progress-fill" class="flat-progress-fill"></div>
       </div>
       <div id="processing-percent-text" class="text-xs font-black text-[#162b3d]">0%</div>
-      <p class="text-[11px] text-slate-400 mt-3">Video diproses dengan kualitas HD 30fps anti patah-patah.</p>
+      
+      <!-- Support Note inside Processing Modal -->
+      <div class="mt-4 pt-3 border-t border-slate-100">
+        <p class="text-[11px] text-slate-500 leading-tight">
+          Ada kendala lag atau patah-patah saat export?<br>
+          Hubungi bantuan: <a href="https://wa.me/6283861669565" target="_blank" class="text-[#b69861] font-bold underline">083861669565</a>
+        </p>
+      </div>
     </div>
   </div>
 
@@ -375,7 +390,7 @@
     </p>
   </footer>
 
-  <!-- App Script with Cache Busting v9.5 -->
-  <script src="assets/js/app.js?v=9.5"></script>
+  <!-- App Script with Cache Busting v9.6 -->
+  <script src="assets/js/app.js?v=9.6"></script>
 </body>
 </html>
