@@ -8,8 +8,8 @@
 
 // Tingkatkan batas resource untuk proses video encoding
 @ini_set('memory_limit', '512M');
-@ini_set('max_execution_time', '180');
-@set_time_limit(180);
+@ini_set('max_execution_time', '300');
+@set_time_limit(300);
 
 // CORS Headers
 header('Access-Control-Allow-Origin: *');
@@ -28,24 +28,55 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// 1. Cari binary FFmpeg
+// 1. Fungsi Pencarian Binary FFmpeg Secara Dinamis
 function getFfmpegBinary() {
-    $candidates = [
-        '/home/iieygoez/bin/ffmpeg',
-        (getenv('HOME') ?: '') . '/bin/ffmpeg',
-        (isset($_SERVER['HOME']) ? $_SERVER['HOME'] : '') . '/bin/ffmpeg',
-        '/usr/bin/ffmpeg',
-        '/usr/local/bin/ffmpeg',
-        'ffmpeg'
-    ];
+    $candidates = [];
+
+    // Deteksi user home dari path file saat ini & Document Root (cPanel / DirectAdmin / VPS)
+    $pathsToInspect = [__DIR__, isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : ''];
+    foreach ($pathsToInspect as $p) {
+        if (!empty($p) && preg_match('#^(/home[0-9]*/[^/]+)#', $p, $matches)) {
+            $userHome = rtrim($matches[1], '/');
+            $candidates[] = $userHome . '/bin/ffmpeg';
+            $candidates[] = $userHome . '/ffmpeg';
+            $candidates[] = $userHome . '/.local/bin/ffmpeg';
+        }
+    }
+
+    if (!empty($_SERVER['HOME'])) {
+        $home = rtrim($_SERVER['HOME'], '/');
+        $candidates[] = $home . '/bin/ffmpeg';
+        $candidates[] = $home . '/ffmpeg';
+    }
+    if (getenv('HOME')) {
+        $home = rtrim(getenv('HOME'), '/');
+        $candidates[] = $home . '/bin/ffmpeg';
+        $candidates[] = $home . '/ffmpeg';
+    }
+
+    // Path folder relatif dari project
+    $candidates[] = realpath(__DIR__ . '/../bin/ffmpeg');
+    $candidates[] = realpath(__DIR__ . '/bin/ffmpeg');
+
+    // Path sistem Linux / Server standar
+    $candidates[] = '/usr/bin/ffmpeg';
+    $candidates[] = '/usr/local/bin/ffmpeg';
+    $candidates[] = '/bin/ffmpeg';
+    $candidates[] = '/opt/ffmpeg/ffmpeg';
+    $candidates[] = '/snap/bin/ffmpeg';
+    $candidates[] = 'ffmpeg';
+
+    // Cek masing-masing path
     foreach ($candidates as $bin) {
         if (!empty($bin)) {
-            $output = @shell_exec(escapeshellcmd($bin) . ' -version 2>&1');
+            $checkCmd = escapeshellcmd($bin) . ' -version 2>&1';
+            $output = @shell_exec($checkCmd);
             if ($output && stripos($output, 'ffmpeg version') !== false) {
                 return $bin;
             }
         }
     }
+
     return null;
 }
 
@@ -55,17 +86,20 @@ if (!$ffmpeg) {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'FFmpeg binary tidak ditemukan di server (/home/iieygoez/bin/ffmpeg).'
+        'message' => 'FFmpeg binary tidak ditemukan di server. Pastikan ffmpeg terpasang di ~/bin/ffmpeg atau /usr/bin/ffmpeg.'
     ]);
     exit;
 }
 
-// 2. Cari file video intro (Framenaur.mp4)
+// 2. Cari File Template Video Intro (Framenaur.mp4)
 $introCandidates = [
     realpath(__DIR__ . '/../assets/videos/Framenaur.mp4'),
     realpath(__DIR__ . '/../assets/Framenaur.mp4'),
-    realpath(__DIR__ . '/../Framenaur.mp4')
+    realpath(__DIR__ . '/../Framenaur.mp4'),
+    realpath(__DIR__ . '/../assets/videos/twibbon ppkkmb 2026 (3).mp4'),
+    realpath(__DIR__ . '/../twibbon ppkkmb 2026 (3).mp4')
 ];
+
 $introVideo = null;
 foreach ($introCandidates as $candidate) {
     if ($candidate && file_exists($candidate) && filesize($candidate) > 1000) {
@@ -79,21 +113,20 @@ if (!$introVideo) {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'File intro video (Framenaur.mp4) tidak ditemukan di server.'
+        'message' => 'File video template intro (Framenaur.mp4) tidak ditemukan di folder assets/videos/.'
     ]);
     exit;
 }
 
-// 3. Siapkan folder temporary
-$tempDir = sys_get_temp_dir();
-if (!is_writable($tempDir)) {
-    $tempDir = __DIR__ . '/../assets/cache';
-    if (!is_dir($tempDir)) {
-        @mkdir($tempDir, 0777, true);
-    }
+// 3. Siapkan Folder Temporary & Cache Lokal
+$cacheDir = realpath(__DIR__ . '/../assets') ? realpath(__DIR__ . '/../assets') . '/cache' : __DIR__ . '/cache';
+if (!is_dir($cacheDir)) {
+    @mkdir($cacheDir, 0777, true);
 }
 
-// CONCURRENCY LIMITER: Maksimal 2 proses FFmpeg bersamaan (Anti-Server Down)
+$tempDir = is_writable($cacheDir) ? $cacheDir : sys_get_temp_dir();
+
+// Concurrency Limiter: Maksimal 2 proses FFmpeg aktif bersamaan
 $maxConcurrent = 2;
 $lockDir = $tempDir . '/twib_locks';
 if (!is_dir($lockDir)) {
@@ -102,7 +135,7 @@ if (!is_dir($lockDir)) {
 
 $lockAcquired = false;
 $lockFp = null;
-$maxWaitSeconds = 60; // Batas tunggu antrean 60 detik
+$maxWaitSeconds = 45;
 $waitStart = time();
 
 while ((time() - $waitStart) < $maxWaitSeconds) {
@@ -116,7 +149,7 @@ while ((time() - $waitStart) < $maxWaitSeconds) {
         }
         if ($fp) @fclose($fp);
     }
-    usleep(300000); // Istirahat 300ms lalu cek slot lagi
+    usleep(300000); // Tunggu 300ms
 }
 
 if (!$lockAcquired) {
@@ -124,12 +157,12 @@ if (!$lockAcquired) {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'Antrean server sedang sangat padat. Mohon tunggu 5 detik lalu klik unduh kembali.'
+        'message' => 'Antrean render server sedang padat. Silakan coba kembali dalam beberapa detik.'
     ]);
     exit;
 }
 
-// Pastikan lock selalu dilepas saat script selesai (shutdown handler)
+// Pastikan lock file selalu dilepas saat script selesai
 register_shutdown_function(function() use (&$lockFp) {
     if ($lockFp) {
         @flock($lockFp, LOCK_UN);
@@ -142,7 +175,7 @@ $uniqueId = bin2hex(random_bytes(8));
 $tempPhotoPath = $tempDir . '/twib_in_' . $uniqueId . '.jpg';
 $tempVideoPath = $tempDir . '/twib_out_' . $uniqueId . '.mp4';
 
-// 4. Ambil gambar yang di-upload (bisa multipart file, base64, atau raw binary)
+// 4. Tangani File Gambar dari Client
 $imageSaved = false;
 
 if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
@@ -157,7 +190,6 @@ if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $imageSaved = file_put_contents($tempPhotoPath, $decoded) !== false;
     }
 } else {
-    // Coba baca dari raw php://input
     $rawInput = file_get_contents('php://input');
     if (!empty($rawInput)) {
         if (strpos($rawInput, 'base64,') !== false) {
@@ -167,7 +199,6 @@ if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
                 $imageSaved = file_put_contents($tempPhotoPath, $decoded) !== false;
             }
         } else {
-            // Raw binary JPG/PNG
             $imageSaved = file_put_contents($tempPhotoPath, $rawInput) !== false;
         }
     }
@@ -180,54 +211,87 @@ if (!$imageSaved || !file_exists($tempPhotoPath) || filesize($tempPhotoPath) < 1
     exit;
 }
 
-// 5. Parameter video
+// 5. Cek Durasi dan Audio Stream dari Video Template
+function inspectMedia($ffmpegBin, $mediaPath) {
+    $info = ['duration' => 10.0, 'hasAudio' => false];
+    $cmd = escapeshellcmd($ffmpegBin) . ' -i ' . escapeshellarg($mediaPath) . ' 2>&1';
+    $output = @shell_exec($cmd);
+    if ($output) {
+        // Cek durasi (contoh: Duration: 00:00:10.20)
+        if (preg_match('/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/', $output, $m)) {
+            $info['duration'] = ($m[1] * 3600) + ($m[2] * 60) + floatval($m[3]);
+        }
+        // Cek stream audio
+        if (stripos($output, 'Audio:') !== false || stripos($output, 'Stream #0:1') !== false || stripos($output, 'Stream #0:0(und): Audio') !== false) {
+            $info['hasAudio'] = true;
+        }
+    }
+    return $info;
+}
+
+$mediaInfo = inspectMedia($ffmpeg, $introVideo);
+$introDuration = max(2.0, floatval($mediaInfo['duration']));
+$hasAudio = $mediaInfo['hasAudio'];
+
+// Parameter durasi
 $holdDuration = isset($_POST['holdDuration']) ? floatval($_POST['holdDuration']) : 5.0;
 if ($holdDuration <= 0 || $holdDuration > 30) $holdDuration = 5.0;
 
-$introDuration = 10.0;
 $crossfadeDuration = 0.6;
-$fadeOffset = round($introDuration - $crossfadeDuration, 2); // 9.4s
-$photoDuration = round($holdDuration + $crossfadeDuration, 2); // 5.6s
-$totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
+if ($introDuration <= $crossfadeDuration) {
+    $crossfadeDuration = max(0.2, $introDuration * 0.2);
+}
 
-// 6. Jalankan FFmpeg dengan timebase synchronization (settb=AVTB)
-// Percobaan 1: Dengan Audio
-$filterWithAudio = sprintf(
-    '"[0:v]settb=AVTB,format=yuv420p[v0];[1:v]settb=AVTB,format=yuv420p[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad=whole_dur=%.2f[a]"',
+$fadeOffset = max(0.0, round($introDuration - $crossfadeDuration, 2));
+$photoDuration = round($holdDuration + $crossfadeDuration, 2);
+$totalDuration = round($fadeOffset + $photoDuration, 2);
+
+// 6. Eksekusi FFmpeg Encoding
+// Normalisasi resolusi ke 1080x1350 dan framerate 30fps sebelum xfade
+$filterVideo = sprintf(
+    '[0:v]scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30,settb=AVTB,format=yuv420p[v0];' .
+    '[1:v]scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30,settb=AVTB,format=yuv420p[v1];' .
+    '[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]',
     $crossfadeDuration,
-    $fadeOffset,
-    $totalDuration
+    $fadeOffset
 );
 
-$cmd = sprintf(
-    '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -c:a aac -b:a 128k -ar 44100 -movflags +faststart %s 2>&1',
-    escapeshellcmd($ffmpeg),
-    escapeshellarg($introVideo),
-    $photoDuration,
-    escapeshellarg($tempPhotoPath),
-    $filterWithAudio,
-    escapeshellarg($tempVideoPath)
-);
+if ($hasAudio) {
+    $filterComplex = sprintf('%s;[0:a]apad=whole_dur=%.2f[a]', $filterVideo, $totalDuration);
+    $cmd = sprintf(
+        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -c:a aac -b:a 128k -ar 44100 -movflags +faststart %s 2>&1',
+        escapeshellcmd($ffmpeg),
+        escapeshellarg($introVideo),
+        $photoDuration,
+        escapeshellarg($tempPhotoPath),
+        escapeshellarg($filterComplex),
+        escapeshellarg($tempVideoPath)
+    );
+} else {
+    $cmd = sprintf(
+        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -movflags +faststart %s 2>&1',
+        escapeshellcmd($ffmpeg),
+        escapeshellarg($introVideo),
+        $photoDuration,
+        escapeshellarg($tempPhotoPath),
+        escapeshellarg($filterVideo),
+        escapeshellarg($tempVideoPath)
+    );
+}
 
 $output = [];
 $returnVar = 0;
 exec($cmd, $output, $returnVar);
 
-// Jika gagal, coba render video-only dengan sinkronisasi timebase
+// Fallback jika mode audio gagal
 if ($returnVar !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath) < 1000) {
-    $filterVideoOnly = sprintf(
-        '"[0:v]settb=AVTB,format=yuv420p[v0];[1:v]settb=AVTB,format=yuv420p[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
-        $crossfadeDuration,
-        $fadeOffset
-    );
-
     $cmdFallback = sprintf(
         '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         $photoDuration,
         escapeshellarg($tempPhotoPath),
-        $filterVideoOnly,
+        escapeshellarg($filterVideo),
         escapeshellarg($tempVideoPath)
     );
 
@@ -236,7 +300,6 @@ if ($returnVar !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath)
     exec($cmdFallback, $outputFallback, $returnVarFallback);
 
     if ($returnVarFallback !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath) < 1000) {
-        // Hapus file temporary photo
         @unlink($tempPhotoPath);
         @unlink($tempVideoPath);
 
@@ -244,15 +307,15 @@ if ($returnVar !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath)
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'message' => 'Gagal merender video dengan FFmpeg.',
+            'message' => 'Gagal merender video dengan FFmpeg di server.',
             'debug' => array_merge($output, $outputFallback)
         ]);
         exit;
     }
 }
 
-// 7. Berhasil! Kirim video MP4 ke browser pengguna
-@unlink($tempPhotoPath); // Hapus foto sementara
+// 7. Berhasil! Kirim Video MP4 ke Browser
+@unlink($tempPhotoPath);
 
 $filename = 'Twibbon_PKKMB_LPKIA_' . date('Ymd_His') . '.mp4';
 $fileSize = filesize($tempVideoPath);
@@ -264,18 +327,16 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-// Stream file ke output buffer
-$fp = fopen($tempVideoPath, 'rb');
+$fp = @fopen($tempVideoPath, 'rb');
 if ($fp) {
     while (!feof($fp)) {
-        echo fread($fp, 65536); // buffer 64KB
+        echo fread($fp, 65536);
         flush();
     }
-    fclose($fp);
+    @fclose($fp);
 } else {
     readfile($tempVideoPath);
 }
 
-// Hapus file video sementara setelah selesai dikirim
 @unlink($tempVideoPath);
 exit;

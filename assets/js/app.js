@@ -1,6 +1,6 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v9.0 - Multi-Photo (1-3 Videos) with Clean Single-Card Upload & Server Concurrency Limiter
+ * v9.1 - Multi-Photo (1-3 Videos) with Server FFmpeg & Seamless Client-Side Fallback Engine
  */
 
 // Global App State
@@ -107,9 +107,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initCanvases() {
   state.previewCanvas = el.previewCanvas;
-  state.previewCtx = state.previewCanvas.getContext('2d');
-  state.previewCanvas.width = state.canvasSize.width;
-  state.previewCanvas.height = state.canvasSize.height;
+  if (state.previewCanvas) {
+    state.previewCtx = state.previewCanvas.getContext('2d');
+    state.previewCanvas.width = state.canvasSize.width;
+    state.previewCanvas.height = state.canvasSize.height;
+  }
 
   state.renderCanvas = document.createElement('canvas');
   state.renderCtx = state.renderCanvas.getContext('2d');
@@ -135,7 +137,9 @@ function loadDefaultAssets() {
   var videoCandidates = [
     'assets/videos/Framenaur.mp4',
     'assets/Framenaur.mp4',
-    'Framenaur.mp4'
+    'Framenaur.mp4',
+    'assets/videos/twibbon ppkkmb 2026 (3).mp4',
+    'twibbon ppkkmb 2026 (3).mp4'
   ];
   loadFirstAvailableVideo(videoCandidates, 0);
 }
@@ -460,7 +464,6 @@ function handleIncomingFiles(fileList) {
       });
       loaded++;
       if (loaded === filesToAdd.length) {
-        // Re-index photo IDs cleanly 1..N
         reindexPhotos();
         renderSelectedPhotosUI();
       }
@@ -512,13 +515,11 @@ function renderSelectedPhotosUI() {
   var count = state.photos.length;
 
   if (count === 0) {
-    // 1. Show Clean Initial Single Card
     if (el.uploadInitialState) el.uploadInitialState.classList.remove('hidden');
     if (el.uploadSelectedState) el.uploadSelectedState.classList.add('hidden');
     return;
   }
 
-  // 2. Show Selected Photos View
   if (el.uploadInitialState) el.uploadInitialState.classList.add('hidden');
   if (el.uploadSelectedState) el.uploadSelectedState.classList.remove('hidden');
 
@@ -526,7 +527,6 @@ function renderSelectedPhotosUI() {
   if (el.btnCropCount) el.btnCropCount.textContent = count;
   if (el.remainingCountBadge) el.remainingCountBadge.textContent = 3 - count;
 
-  // Show / Hide "+ Tambah Foto" button in header
   if (el.btnAddMorePhotos) {
     if (count < 3) {
       el.btnAddMorePhotos.classList.remove('hidden');
@@ -535,7 +535,6 @@ function renderSelectedPhotosUI() {
     }
   }
 
-  // Render cards in selected-photos-grid
   if (el.selectedPhotosGrid) {
     el.selectedPhotosGrid.innerHTML = '';
 
@@ -593,7 +592,6 @@ function renderSelectedPhotosUI() {
       el.selectedPhotosGrid.appendChild(card);
     });
 
-    // If less than 3 photos, add an interactive dashed "+ Tambah Foto" slot
     if (count < 3) {
       var nextSlotNum = count + 1;
       var addSlot = document.createElement('div');
@@ -628,7 +626,6 @@ function openCropper(photoIndex) {
 
   var totalActive = state.photos.length;
 
-  // Hide cropper tab bar if ONLY 1 photo
   if (totalActive <= 1) {
     if (el.cropperTabsContainer) el.cropperTabsContainer.classList.add('hidden');
   } else {
@@ -644,7 +641,6 @@ function openCropper(photoIndex) {
         }
       }
     });
-    // Hide unused tabs
     for (var j = totalActive; j < 3; j++) {
       if (el.cropTabs[j]) el.cropTabs[j].classList.add('hidden');
     }
@@ -703,7 +699,6 @@ function saveCurrentCropperState() {
 function confirmCropAndProceed() {
   saveCurrentCropperState();
 
-  // Ensure every active photo has a croppedCanvas (fallback to cover draw if unadjusted)
   state.photos.forEach(function(photo) {
     if (photo.rawSrc && !photo.croppedCanvas) {
       var img = new Image();
@@ -749,12 +744,10 @@ function setupPreviewAndDownloadUI() {
   var count = state.photos.length;
 
   if (count <= 1) {
-    // 1 Photo: Clean Single Preview, Hide Multi-photo Tabs & Grid
     if (el.previewTabsContainer) el.previewTabsContainer.classList.add('hidden');
     if (el.individualDownloadGrid) el.individualDownloadGrid.classList.add('hidden');
     if (el.btnDownloadAllText) el.btnDownloadAllText.textContent = 'Download Video Twibbon (MP4)';
   } else {
-    // > 1 Photo: Show Multi-photo Tabs and Batch Download
     if (el.previewTabsContainer) el.previewTabsContainer.classList.remove('hidden');
     if (el.individualDownloadGrid) el.individualDownloadGrid.classList.remove('hidden');
     if (el.btnDownloadAllText) {
@@ -920,7 +913,7 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 }
 
 /* ============================================================
- * HIGH-CONCURRENCY SERVER VIDEO EXPORT (Single or Batch)
+ * VIDEO EXPORT ENGINE (High-Speed Server FFmpeg with Auto Client-Side Fallback)
  * ============================================================ */
 async function startBatchVideoExport(specificIndex) {
   if (state.isRendering) return;
@@ -964,7 +957,7 @@ async function startBatchVideoExport(specificIndex) {
       await renderSinglePhotoVideo(photo, currentNum, total);
       successCount++;
       if (i < total - 1) {
-        await new Promise(function(r) { setTimeout(r, 500); });
+        await new Promise(function(r) { setTimeout(r, 400); });
       }
     } catch (err) {
       console.error('Gagal render video foto ' + photo.id + ':', err);
@@ -979,7 +972,7 @@ async function startBatchVideoExport(specificIndex) {
     Swal.fire({
       icon: 'success',
       title: 'Semua Video Berhasil Diunduh! 🎉',
-      html: 'Total <b>' + successCount + ' video MP4</b> telah berhasil dirender dengan kualitas HD 30fps.',
+      html: 'Total <b>' + successCount + ' video MP4</b> telah selesai dibuat dan tersimpan di perangkat kamu.',
       confirmButtonColor: '#162b3d'
     });
   } else if (successCount > 0) {
@@ -993,15 +986,18 @@ async function startBatchVideoExport(specificIndex) {
     Swal.fire({
       icon: 'error',
       title: 'Gagal Membuat Video',
-      text: 'Terjadi kendala saat memproses video ke server. Silakan coba kembali.',
+      text: 'Terjadi kendala saat memproses video. Silakan periksa koneksi atau coba kembali.',
       confirmButtonColor: '#162b3d'
     });
   }
 }
 
+/**
+ * Render single video with Server FFmpeg first, automatically fallbacks to Browser Canvas Engine if server fails
+ */
 function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
   return new Promise(function(resolve, reject) {
-    updateExportProgress(5, 'Menyiapkan gambar twibbon (Foto ' + photo.id + ')...');
+    updateExportProgress(5, 'Menyiapkan gambar komposisi (Foto ' + photo.id + ')...');
 
     var exportCanvas = document.createElement('canvas');
     exportCanvas.width = state.canvasSize.width;
@@ -1019,7 +1015,7 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
         return reject(new Error('Gagal membuat blob gambar'));
       }
 
-      updateExportProgress(15, 'Mengirim ke antrean server (Foto ' + photo.id + ')...');
+      updateExportProgress(15, 'Menghubungkan ke server render (Foto ' + photo.id + ')...');
 
       var formData = new FormData();
       formData.append('image', blob, 'twibbon_composite_' + photo.id + '.jpg');
@@ -1028,11 +1024,11 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
       var curPercent = 15;
       var timer = setInterval(function() {
         if (curPercent < 85) {
-          curPercent += Math.floor(Math.random() * 5) + 3;
+          curPercent += Math.floor(Math.random() * 4) + 2;
           if (curPercent > 85) curPercent = 85;
           updateExportProgress(curPercent, 'Server sedang merender Video ' + currentIdx + ' dari ' + totalCount + ' (30fps HD)...');
         }
-      }, 400);
+      }, 350);
 
       try {
         var response = await fetch('api/render.php', {
@@ -1042,26 +1038,143 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
 
         clearInterval(timer);
 
-        if (!response.ok) {
-          var errData = {};
-          try { errData = await response.json(); } catch(e) {}
-          throw new Error(errData.message || ('Server error ' + response.status));
+        if (response.ok && response.headers.get('Content-Type') && response.headers.get('Content-Type').includes('video')) {
+          updateExportProgress(92, 'Mengunduh file MP4 Video ' + photo.id + '...');
+          var videoBlob = await response.blob();
+          var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
+          downloadBlob(videoBlob, filename);
+          updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
+          return setTimeout(resolve, 300);
         }
 
-        updateExportProgress(92, 'Mengunduh file MP4 Video ' + photo.id + '...');
+        // Jika server respon bukan video (misal 500 / JSON error), coba baca pesannya lalu fallback ke browser engine
+        var errMsg = 'Server render tidak tersedia.';
+        try {
+          var errJson = await response.json();
+          errMsg = errJson.message || errMsg;
+        } catch(e) {}
+        console.warn('Server render failed (' + errMsg + '). Beralih ke client-side engine...');
 
-        var videoBlob = await response.blob();
-        var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
-        downloadBlob(videoBlob, filename);
+        // Fallback langsung ke Client-Side Canvas MediaRecorder
+        await renderClientSideVideo(photo, exportCanvas, currentIdx, totalCount);
+        resolve();
 
-        updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
-        setTimeout(resolve, 300);
-
-      } catch (err) {
+      } catch (networkOrServerError) {
         clearInterval(timer);
-        reject(err);
+        console.warn('Gagal render server (' + networkOrServerError.message + '). Menggunakan Browser Client Engine...');
+        try {
+          await renderClientSideVideo(photo, exportCanvas, currentIdx, totalCount);
+          resolve();
+        } catch (clientErr) {
+          reject(clientErr);
+        }
       }
     }, 'image/jpeg', 0.95);
+  });
+}
+
+/**
+ * High-Quality Client-Side Canvas MediaRecorder Fallback
+ */
+function renderClientSideVideo(photo, compositeCanvas, currentIdx, totalCount) {
+  return new Promise(function(resolve, reject) {
+    updateExportProgress(20, 'Memulai engine browser video ' + currentIdx + '...');
+
+    var canvas = document.createElement('canvas');
+    canvas.width = state.canvasSize.width;
+    canvas.height = state.canvasSize.height;
+    var ctx = canvas.getContext('2d');
+
+    var stream = canvas.captureStream(30);
+    var options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 6000000 };
+
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 5000000 };
+    }
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/webm' };
+    }
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/mp4' };
+    }
+
+    var recorder;
+    try {
+      recorder = new MediaRecorder(stream, options);
+    } catch (e) {
+      return reject(new Error('MediaRecorder tidak didukung di browser ini.'));
+    }
+
+    var recordedChunks = [];
+    recorder.ondataavailable = function(e) {
+      if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    recorder.onstop = function() {
+      var blobType = options.mimeType.includes('mp4') ? 'video/mp4' : 'video/webm';
+      var ext = options.mimeType.includes('mp4') ? '.mp4' : '.mp4'; // simpan dengan nama .mp4 untuk kemudahan pengguna
+      var blob = new Blob(recordedChunks, { type: blobType });
+      var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + ext;
+      downloadBlob(blob, filename);
+      updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
+      setTimeout(resolve, 300);
+    };
+
+    var introDuration = state.introVideo.duration && !isNaN(state.introVideo.duration) ? state.introVideo.duration : 10.0;
+    var totalDuration = introDuration + (state.holdPhotoDuration || 5.0);
+    var crossfadeDuration = 0.6;
+    var fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
+
+    var tempVideo = document.createElement('video');
+    tempVideo.src = state.introVideo.src;
+    tempVideo.crossOrigin = 'anonymous';
+    tempVideo.muted = true;
+    tempVideo.playsInline = true;
+
+    recorder.start(200);
+
+    var fps = 30;
+    var totalFrames = Math.ceil(totalDuration * fps);
+    var currentFrame = 0;
+
+    tempVideo.currentTime = 0;
+    tempVideo.play().catch(function() {});
+
+    var startTime = performance.now();
+
+    function renderLoop() {
+      var now = performance.now();
+      var time = (now - startTime) / 1000;
+
+      if (time >= totalDuration) {
+        tempVideo.pause();
+        recorder.stop();
+        return;
+      }
+
+      ctx.fillStyle = '#162b3d';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (time < fadeStartTime) {
+        drawCoverMedia(ctx, tempVideo, canvas.width, canvas.height);
+      } else if (time >= fadeStartTime && time < introDuration) {
+        drawCoverMedia(ctx, tempVideo, canvas.width, canvas.height);
+        var progress = (time - fadeStartTime) / crossfadeDuration;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, Math.max(0, progress));
+        ctx.drawImage(compositeCanvas, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+      } else {
+        ctx.drawImage(compositeCanvas, 0, 0, canvas.width, canvas.height);
+      }
+
+      var progressPercent = Math.min(95, Math.floor(20 + (time / totalDuration) * 75));
+      updateExportProgress(progressPercent, 'Merender frame ' + time.toFixed(1) + 's / ' + totalDuration.toFixed(1) + 's (Video ' + currentIdx + ')...');
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    requestAnimationFrame(renderLoop);
   });
 }
 
