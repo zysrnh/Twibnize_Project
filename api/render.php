@@ -4,6 +4,7 @@
  * Twibbon Video Maker - PKKMB SADAJIWA IDE LPKIA 2026
  * 
  * Endpoint: /api/render.php (POST)
+ * v10.2 - Fixed encoder init: filter-based yuv420p conversion
  */
 
 // Tingkatkan batas resource untuk proses video encoding
@@ -192,14 +193,18 @@ $photoDuration = round($holdDuration + $crossfadeDuration, 2); // 5.6s
 $totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
 
 // ============================================================
-// ============================================================
 // 6. TWO-PASS ENCODING: 100% Anti-Crash & Anti-Buffer Overflow
+// ============================================================
+// PENTING: Pakai -vf filter untuk konversi pixel format, BUKAN -pix_fmt flag.
+// JPEG dari canvas browser sering punya format yuvj444p (full-range 4:4:4),
+// yang ditolak libx264 kalau cuma pakai -pix_fmt yuv420p.
+// Filter-based conversion "format=yuv420p" yang benar.
+// Juga paksa dimensi genap dengan scale=trunc(iw/2)*2:trunc(ih/2)*2.
 // ============================================================
 
 // Langkah 1: Render Foto menjadi Video MP4 Mini (5.6 detik)
-// Foto sudah berukuran pas 1080x1350 dari canvas frontend
 $cmdClip = sprintf(
-    '%s -y -loop 1 -i %s -t %.2f -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 %s 2>&1',
+    '%s -y -framerate 30 -loop 1 -i %s -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p" -t %.2f -c:v libx264 -preset ultrafast -crf 23 %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($tempPhotoPath),
     $photoDuration,
@@ -223,15 +228,17 @@ if ($returnVarClip !== 0 || !file_exists($tempClipPath) || filesize($tempClipPat
 }
 
 // Langkah 2: Gabungkan Video Intro + Klip Foto dengan Transisi Sihir (xfade)
+// PENTING: format=yuv420p ditaruh DI DALAM filter_complex, bukan sebagai output flag.
+
 // Method 1: XFade Transition + Audio Sinkronisasi
 $filterMethod1 = sprintf(
-    '[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad[a]',
+    '[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f,format=yuv420p[v];[0:a]apad[a]',
     $crossfadeDuration,
     $fadeOffset
 );
 
 $cmdMethod1 = sprintf(
-    '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
+    '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 23 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($introVideo),
     escapeshellarg($tempClipPath),
@@ -249,14 +256,16 @@ $renderSuccess = ($returnVar1 === 0 && file_exists($tempVideoPath) && filesize($
 // Method 2: XFade Transition Video-Only (jika ada kendala audio track)
 $output2 = [];
 if (!$renderSuccess) {
+    @unlink($tempVideoPath); // Bersihkan file gagal sebelumnya
+
     $filterMethod2 = sprintf(
-        '[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]',
+        '[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f,format=yuv420p[v]',
         $crossfadeDuration,
         $fadeOffset
     );
 
     $cmdMethod2 = sprintf(
-        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -c:v libx264 -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         escapeshellarg($tempClipPath),
@@ -270,13 +279,15 @@ if (!$renderSuccess) {
     $renderSuccess = ($returnVar2 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000);
 }
 
-// Method 3: Concat Fallback
+// Method 3: Concat Fallback (tanpa crossfade, paling aman)
 $output3 = [];
 if (!$renderSuccess) {
-    $filterMethod3 = '[0:v]setsar=1[v0];[1:v]setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]';
+    @unlink($tempVideoPath); // Bersihkan file gagal sebelumnya
+
+    $filterMethod3 = '[0:v]setsar=1,format=yuv420p[v0];[1:v]setsar=1,format=yuv420p[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]';
 
     $cmdMethod3 = sprintf(
-        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         escapeshellarg($tempClipPath),
