@@ -140,6 +140,7 @@ register_shutdown_function(function() use (&$lockFp) {
 
 $uniqueId = bin2hex(random_bytes(8));
 $tempPhotoPath = $tempDir . '/twib_in_' . $uniqueId . '.jpg';
+$tempClipPath  = $tempDir . '/twib_clip_' . $uniqueId . '.mp4';
 $tempVideoPath = $tempDir . '/twib_out_' . $uniqueId . '.mp4';
 
 // 4. Ambil gambar yang di-upload (bisa multipart file, base64, atau raw binary)
@@ -187,21 +188,52 @@ if ($holdDuration <= 0 || $holdDuration > 30) $holdDuration = 5.0;
 $introDuration = 10.0;
 $crossfadeDuration = 0.6;
 $fadeOffset = round($introDuration - $crossfadeDuration, 2); // 9.4s
-$totalDuration = round($fadeOffset + $holdDuration + $crossfadeDuration, 2); // 15.0s
+$photoDuration = round($holdDuration + $crossfadeDuration, 2); // 5.6s
+$totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
 
-// 6. Jalankan FFmpeg dengan Multi-Level Fallback Engine
-// Method 1: High-Definition XFade Transition + Audio Synchronization
+// ============================================================
+// 6. TWO-PASS ENCODING: 100% Anti-Crash & Anti-Buffer Overflow
+// ============================================================
+
+// Langkah 1: Render Foto menjadi Video MP4 Mini (5.6 detik)
+// Sangat cepat (~0.2 detik) dan menghasilkan stream video MP4 valid dengan framerate 30fps
+$cmdClip = sprintf(
+    '%s -y -loop 1 -framerate 30 -i %s -t %.2f -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 %s 2>&1',
+    escapeshellcmd($ffmpeg),
+    escapeshellarg($tempPhotoPath),
+    $photoDuration,
+    escapeshellarg($tempClipPath)
+);
+$outputClip = [];
+$returnVarClip = 0;
+exec($cmdClip, $outputClip, $returnVarClip);
+
+if ($returnVarClip !== 0 || !file_exists($tempClipPath) || filesize($tempClipPath) < 1000) {
+    @unlink($tempPhotoPath);
+    @unlink($tempClipPath);
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'message' => 'Gagal membuat klip foto: ' . implode(' | ', array_slice($outputClip, -3)),
+        'debug' => $outputClip
+    ]);
+    exit;
+}
+
+// Langkah 2: Gabungkan Video Intro + Klip Foto dengan Transisi Sihir (xfade)
+// Method 1: XFade Transition + Audio Sinkronisasi
 $filterMethod1 = sprintf(
-    '"[0:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v0];[1:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad[a]"',
+    '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad[a]"',
     $crossfadeDuration,
     $fadeOffset
 );
 
 $cmdMethod1 = sprintf(
-    '%s -y -i %s -loop 1 -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
+    '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($introVideo),
-    escapeshellarg($tempPhotoPath),
+    escapeshellarg($tempClipPath),
     $filterMethod1,
     $totalDuration,
     escapeshellarg($tempVideoPath)
@@ -213,20 +245,20 @@ exec($cmdMethod1, $output1, $returnVar1);
 
 $renderSuccess = ($returnVar1 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000);
 
-// Method 2: XFade Transition Video-Only (jika audio stream pada input 0 bermasalah)
+// Method 2: XFade Transition Video-Only (jika ada kendala audio track)
 $output2 = [];
 if (!$renderSuccess) {
     $filterMethod2 = sprintf(
-        '"[0:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v0];[1:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
+        '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
         $crossfadeDuration,
         $fadeOffset
     );
 
     $cmdMethod2 = sprintf(
-        '%s -y -i %s -loop 1 -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
-        escapeshellarg($tempPhotoPath),
+        escapeshellarg($tempClipPath),
         $filterMethod2,
         $totalDuration,
         escapeshellarg($tempVideoPath)
@@ -237,16 +269,16 @@ if (!$renderSuccess) {
     $renderSuccess = ($returnVar2 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000);
 }
 
-// Method 3: Concat Filter Fallback (dijamin support 100% di semua versi FFmpeg lama/baru)
+// Method 3: Concat Fallback
 $output3 = [];
 if (!$renderSuccess) {
-    $filterMethod3 = '"[0:v]scale=1080:1350,setsar=1,format=yuv420p[v0];[1:v]scale=1080:1350,setsar=1,format=yuv420p[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]"';
+    $filterMethod3 = '"[0:v]setsar=1[v0];[1:v]setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]"';
 
     $cmdMethod3 = sprintf(
-        '%s -y -i %s -loop 1 -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
-        escapeshellarg($tempPhotoPath),
+        escapeshellarg($tempClipPath),
         $filterMethod3,
         $introDuration + $holdDuration,
         escapeshellarg($tempVideoPath)
@@ -257,11 +289,14 @@ if (!$renderSuccess) {
     $renderSuccess = ($returnVar3 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000);
 }
 
+// Cleanup intermediate files
+@unlink($tempPhotoPath);
+@unlink($tempClipPath);
+
 if (!$renderSuccess) {
-    @unlink($tempPhotoPath);
     @unlink($tempVideoPath);
 
-    $allLogs = array_filter(array_merge($output1, $output2, $output3));
+    $allLogs = array_filter(array_merge($outputClip, $output1, $output2, $output3));
     $lastErrorLines = array_slice($allLogs, -4);
 
     http_response_code(500);
@@ -275,8 +310,6 @@ if (!$renderSuccess) {
 }
 
 // 7. Berhasil! Kirim video MP4 ke browser pengguna
-@unlink($tempPhotoPath); // Hapus foto sementara
-
 $filename = 'Twibbon_PKKMB_LPKIA_' . date('Ymd_His') . '.mp4';
 $fileSize = filesize($tempVideoPath);
 
