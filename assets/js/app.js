@@ -1,7 +1,18 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v9.0 - Multi-Photo (1-3 Videos) with Clean Single-Card Upload & Server Concurrency Limiter
+ * v10.0 - Queue Ticket System + Auto-Recovery + Anti Patah-Patah
+ * 
+ * Semua video dirender 100% di server oleh FFmpeg.
+ * HP maba cuma terima file MP4 jadi (gak ada rendering di browser).
+ * Sistem antrean: kalau server sibuk, maba dapat nomor antrean & estimasi waktu.
+ * Kalau maba pindah tab / tutup browser, tiket disimpan di localStorage.
+ * Begitu buka lagi, video yang udah jadi bisa langsung diunduh.
  */
+
+// ============================================================
+// LOCALSTORAGE KEY untuk menyimpan tiket antrean aktif
+// ============================================================
+var TICKET_STORAGE_KEY = 'pkkmb_twibbon_tickets';
 
 // Global App State
 const state = {
@@ -25,7 +36,11 @@ const state = {
   holdPhotoDuration: 5,
   aspectRatio: 1080 / 1350,
   canvasSize: { width: 1080, height: 1350 },
-  replaceTargetIndex: -1
+  replaceTargetIndex: -1,
+  // Queue state
+  activeTickets: [],      // Array of { ticket_id, photo_id, status }
+  pollIntervalId: null,
+  hasActiveQueueJob: false
 };
 
 // DOM Elements Cache
@@ -89,12 +104,20 @@ const el = {
   btnDlVideo3: document.getElementById('btn-dl-video-3'),
   btnDownloadPhoto: document.getElementById('btn-download-photo'),
 
-  // Processing Modal Elements
+  // Processing Modal Elements (Enhanced with Queue)
   processingModal: document.getElementById('processing-modal'),
   processingTitleText: document.getElementById('processing-title-text'),
   processingProgressFill: document.getElementById('processing-progress-fill'),
   processingStatusText: document.getElementById('processing-status-text'),
-  processingPercentText: document.getElementById('processing-percent-text')
+  processingPercentText: document.getElementById('processing-percent-text'),
+  queuePositionBadge: document.getElementById('queue-position-badge'),
+  queuePositionNumber: document.getElementById('queue-position-number'),
+  queuePositionDetail: document.getElementById('queue-position-detail'),
+
+  // Recovery Banner Elements
+  recoveryBanner: document.getElementById('recovery-banner'),
+  recoveryStatusText: document.getElementById('recovery-status-text'),
+  btnDismissRecovery: document.getElementById('btn-dismiss-recovery')
 };
 
 // Initialize Application
@@ -103,6 +126,33 @@ document.addEventListener('DOMContentLoaded', function() {
   loadDefaultAssets();
   bindEvents();
   renderSelectedPhotosUI();
+  
+  // Check for pending tickets from previous session (auto-recovery)
+  checkPendingTicketsOnLoad();
+  
+  // Lifecycle Events: visibilitychange + beforeunload
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && state.hasActiveQueueJob) {
+      // Maba kembali ke tab -> langsung sinkronisasi status tiket
+      console.log('[Queue] Tab aktif kembali, sinkronisasi tiket...');
+    }
+  });
+
+  window.addEventListener('beforeunload', function(e) {
+    if (state.hasActiveQueueJob) {
+      var msg = 'Video sedang diproses di server. Yakin mau keluar? (Video tetap diproses, bisa diambil nanti)';
+      e.returnValue = msg;
+      return msg;
+    }
+  });
+
+  // Recovery banner dismiss
+  if (el.btnDismissRecovery) {
+    el.btnDismissRecovery.addEventListener('click', function() {
+      if (el.recoveryBanner) el.recoveryBanner.classList.add('hidden');
+      clearSavedTickets();
+    });
+  }
 });
 
 function initCanvases() {
@@ -920,7 +970,8 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 }
 
 /* ============================================================
- * HIGH-CONCURRENCY SERVER VIDEO EXPORT (Single or Batch)
+ * QUEUE-BASED VIDEO EXPORT ENGINE (Tiket Antrean + Polling)
+ * Server renders video async, HP cuma download file MP4 jadi.
  * ============================================================ */
 async function startBatchVideoExport(specificIndex) {
   if (state.isRendering) return;
@@ -944,6 +995,7 @@ async function startBatchVideoExport(specificIndex) {
   }
 
   state.isRendering = true;
+  state.hasActiveQueueJob = true;
   stopPreviewPlayer();
   el.processingModal.classList.remove('hidden');
 
@@ -961,25 +1013,29 @@ async function startBatchVideoExport(specificIndex) {
     }
 
     try {
-      await renderSinglePhotoVideo(photo, currentNum, total);
+      await submitAndPollSingleVideo(photo, currentNum, total);
       successCount++;
       if (i < total - 1) {
-        await new Promise(function(r) { setTimeout(r, 500); });
+        await new Promise(function(r) { setTimeout(r, 300); });
       }
     } catch (err) {
-      console.error('Gagal render video foto ' + photo.id + ':', err);
+      console.error('[Queue] Gagal render video foto ' + photo.id + ':', err);
     }
   }
 
+  // Selesai semua
   el.processingModal.classList.add('hidden');
+  hideQueueBadge();
   state.isRendering = false;
+  state.hasActiveQueueJob = false;
+  clearSavedTickets();
   startPreviewPlayer();
 
   if (successCount === total) {
     Swal.fire({
       icon: 'success',
       title: 'Semua Video Berhasil Diunduh! 🎉',
-      html: 'Total <b>' + successCount + ' video MP4</b> telah berhasil dirender dengan kualitas HD 30fps.',
+      html: 'Total <b>' + successCount + ' video MP4</b> telah dirender dengan kualitas HD 30fps.',
       confirmButtonColor: '#162b3d'
     });
   } else if (successCount > 0) {
@@ -993,16 +1049,20 @@ async function startBatchVideoExport(specificIndex) {
     Swal.fire({
       icon: 'error',
       title: 'Gagal Membuat Video',
-      text: 'Terjadi kendala saat memproses video ke server. Silakan coba kembali.',
+      text: 'Terjadi kendala saat mengirim ke server. Silakan coba kembali.',
       confirmButtonColor: '#162b3d'
     });
   }
 }
 
-function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
+/**
+ * Submit 1 foto ke antrean server, lalu polling status sampai selesai.
+ */
+function submitAndPollSingleVideo(photo, currentIdx, totalCount) {
   return new Promise(function(resolve, reject) {
     updateExportProgress(5, 'Menyiapkan gambar twibbon (Foto ' + photo.id + ')...');
 
+    // 1. Buat composite canvas (foto + frame overlay)
     var exportCanvas = document.createElement('canvas');
     exportCanvas.width = state.canvasSize.width;
     exportCanvas.height = state.canvasSize.height;
@@ -1014,61 +1074,308 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
       ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, exportCanvas.width, exportCanvas.height);
     }
 
+    // 2. Convert ke JPEG blob
     exportCanvas.toBlob(async function(blob) {
       if (!blob) {
         return reject(new Error('Gagal membuat blob gambar'));
       }
 
-      updateExportProgress(15, 'Mengirim ke antrean server (Foto ' + photo.id + ')...');
+      updateExportProgress(10, 'Mengirim foto ke antrean server...');
 
+      // 3. Submit ke queue endpoint
       var formData = new FormData();
       formData.append('image', blob, 'twibbon_composite_' + photo.id + '.jpg');
       formData.append('holdDuration', state.holdPhotoDuration || 5);
 
-      var curPercent = 15;
-      var timer = setInterval(function() {
-        if (curPercent < 85) {
-          curPercent += Math.floor(Math.random() * 5) + 3;
-          if (curPercent > 85) curPercent = 85;
-          updateExportProgress(curPercent, 'Server sedang merender Video ' + currentIdx + ' dari ' + totalCount + ' (30fps HD)...');
-        }
-      }, 400);
-
       try {
-        var response = await fetch('api/render.php', {
+        var submitResponse = await fetch('api/queue.php', {
           method: 'POST',
           body: formData
         });
 
-        clearInterval(timer);
-
-        if (!response.ok) {
+        if (!submitResponse.ok) {
           var errData = {};
-          try { errData = await response.json(); } catch(e) {}
-          throw new Error(errData.message || ('Server error ' + response.status));
+          try { errData = await submitResponse.json(); } catch(e) {}
+          throw new Error(errData.message || ('Server error ' + submitResponse.status));
         }
 
-        updateExportProgress(92, 'Mengunduh file MP4 Video ' + photo.id + '...');
+        var submitResult = await submitResponse.json();
+        if (!submitResult.success || !submitResult.ticket_id) {
+          throw new Error(submitResult.message || 'Gagal mendapatkan tiket antrean.');
+        }
 
-        var videoBlob = await response.blob();
+        var ticketId = submitResult.ticket_id;
+        console.log('[Queue] Tiket diterima: ' + ticketId + ', posisi: ' + submitResult.position);
+
+        // 4. Simpan tiket ke localStorage (untuk recovery)
+        saveTicketToStorage(ticketId, photo.id);
+
+        // 5. Show queue position jika posisi > 2
+        if (submitResult.position > 2) {
+          showQueueBadge(submitResult.position, submitResult.estimated_seconds);
+        }
+
+        updateExportProgress(15, submitResult.message || 'Antrean diterima...');
+
+        // 6. Polling status sampai done / error
+        await pollUntilDone(ticketId, photo.id, currentIdx, totalCount);
+
+        // 7. Berhasil! Download video
+        updateExportProgress(95, 'Mengunduh file MP4 Video ' + photo.id + '...');
+
+        var downloadUrl = 'api/download.php?ticket=' + ticketId;
+        var videoResponse = await fetch(downloadUrl);
+        if (!videoResponse.ok) {
+          throw new Error('Gagal mengunduh video dari server.');
+        }
+        var videoBlob = await videoResponse.blob();
         var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
         downloadBlob(videoBlob, filename);
 
-        updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
+        updateExportProgress(100, 'Selesai Video ' + photo.id + '! ✅');
+        removeTicketFromStorage(ticketId);
+        hideQueueBadge();
+
         setTimeout(resolve, 300);
 
       } catch (err) {
-        clearInterval(timer);
         reject(err);
       }
     }, 'image/jpeg', 0.95);
   });
 }
 
+/**
+ * Polling status tiket setiap 2 detik sampai status = done atau error.
+ */
+function pollUntilDone(ticketId, photoId, currentIdx, totalCount) {
+  return new Promise(function(resolve, reject) {
+    var pollCount = 0;
+    var maxPolls = 150; // 150 x 2s = 5 menit max
+    
+    var intervalId = setInterval(async function() {
+      pollCount++;
+      
+      if (pollCount > maxPolls) {
+        clearInterval(intervalId);
+        reject(new Error('Timeout: Server terlalu lama memproses video.'));
+        return;
+      }
+
+      try {
+        var response = await fetch('api/status.php?ticket=' + ticketId + '&_t=' + Date.now());
+        if (!response.ok) {
+          clearInterval(intervalId);
+          reject(new Error('Gagal mengecek status tiket.'));
+          return;
+        }
+
+        var data = await response.json();
+        
+        if (data.status === 'done') {
+          clearInterval(intervalId);
+          resolve();
+          return;
+        }
+
+        if (data.status === 'error' || data.status === 'expired') {
+          clearInterval(intervalId);
+          reject(new Error(data.message || 'Gagal merender video.'));
+          return;
+        }
+
+        // Masih queued / processing
+        if (data.status === 'processing') {
+          var serverProgress = data.progress || 50;
+          var displayProgress = Math.min(90, Math.max(20, serverProgress));
+          updateExportProgress(displayProgress, 'Server sedang merender Video ' + currentIdx + ' dari ' + totalCount + ' (HD 30fps)...');
+          hideQueueBadge();
+        } else if (data.status === 'queued') {
+          var position = data.position || 1;
+          var estimated = data.estimated_seconds || 5;
+          updateExportProgress(15, data.message || ('Antrean ke-' + position));
+          showQueueBadge(position, estimated);
+        }
+
+      } catch (fetchErr) {
+        // Network error sementara, lanjut polling (mungkin HP lagi sleep)
+        console.warn('[Queue] Polling error (akan dicoba lagi):', fetchErr.message);
+      }
+    }, 2000);
+  });
+}
+
+/* ============================================================
+ * QUEUE UI HELPERS
+ * ============================================================ */
+function showQueueBadge(position, estimatedSeconds) {
+  if (el.queuePositionBadge) {
+    el.queuePositionBadge.classList.remove('hidden');
+    if (el.queuePositionNumber) el.queuePositionNumber.textContent = '#' + position;
+    if (el.queuePositionDetail) {
+      el.queuePositionDetail.textContent = 'Estimasi ~' + estimatedSeconds + ' detik. Mohon tunggu sebentar.';
+    }
+  }
+}
+
+function hideQueueBadge() {
+  if (el.queuePositionBadge) {
+    el.queuePositionBadge.classList.add('hidden');
+  }
+}
+
 function updateExportProgress(percent, text) {
   if (el.processingProgressFill) el.processingProgressFill.style.width = percent + '%';
   if (el.processingPercentText) el.processingPercentText.textContent = percent + '%';
   if (el.processingStatusText) el.processingStatusText.textContent = text;
+}
+
+/* ============================================================
+ * LOCALSTORAGE TICKET PERSISTENCE (Auto-Recovery)
+ * Tiket disimpan di HP maba supaya kalau pindah tab/browser
+ * ketutup, begitu buka lagi bisa langsung download videonya.
+ * ============================================================ */
+function saveTicketToStorage(ticketId, photoId) {
+  try {
+    var tickets = getSavedTickets();
+    tickets.push({ ticket_id: ticketId, photo_id: photoId, saved_at: Date.now() });
+    localStorage.setItem(TICKET_STORAGE_KEY, JSON.stringify(tickets));
+  } catch(e) {}
+}
+
+function removeTicketFromStorage(ticketId) {
+  try {
+    var tickets = getSavedTickets();
+    tickets = tickets.filter(function(t) { return t.ticket_id !== ticketId; });
+    localStorage.setItem(TICKET_STORAGE_KEY, JSON.stringify(tickets));
+  } catch(e) {}
+}
+
+function getSavedTickets() {
+  try {
+    var raw = localStorage.getItem(TICKET_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return [];
+}
+
+function clearSavedTickets() {
+  try {
+    localStorage.removeItem(TICKET_STORAGE_KEY);
+  } catch(e) {}
+}
+
+/**
+ * Cek apakah ada tiket pending dari sesi sebelumnya.
+ * Jika ada, tampilkan recovery banner atau langsung download.
+ */
+async function checkPendingTicketsOnLoad() {
+  var tickets = getSavedTickets();
+  if (tickets.length === 0) return;
+
+  // Filter tiket yang masih fresh (< 2 jam)
+  var maxAge = 2 * 60 * 60 * 1000; // 2 jam
+  var freshTickets = tickets.filter(function(t) {
+    return (Date.now() - t.saved_at) < maxAge;
+  });
+
+  if (freshTickets.length === 0) {
+    clearSavedTickets();
+    return;
+  }
+
+  // Cek status tiket pertama
+  for (var i = 0; i < freshTickets.length; i++) {
+    var ticket = freshTickets[i];
+    try {
+      var response = await fetch('api/status.php?ticket=' + ticket.ticket_id + '&_t=' + Date.now());
+      if (!response.ok) continue;
+      var data = await response.json();
+
+      if (data.status === 'done') {
+        // Video sudah jadi! Tampilkan SweetAlert langsung download
+        var downloadUrl = data.download_url || ('api/download.php?ticket=' + ticket.ticket_id);
+        Swal.fire({
+          icon: 'success',
+          title: 'Video Kamu Sudah Jadi! 🎉',
+          html: 'Video Twibbon Foto ' + ticket.photo_id + ' yang tadi sudah selesai diproses server.',
+          confirmButtonText: 'Unduh Video Sekarang',
+          confirmButtonColor: '#162b3d',
+          showCancelButton: true,
+          cancelButtonText: 'Nanti Saja'
+        }).then(function(result) {
+          if (result.isConfirmed) {
+            // Trigger download
+            window.location.href = downloadUrl;
+          }
+          removeTicketFromStorage(ticket.ticket_id);
+        });
+        return; // Tangani satu per satu
+      } else if (data.status === 'queued' || data.status === 'processing') {
+        // Masih diproses, tampilkan recovery banner
+        if (el.recoveryBanner) {
+          el.recoveryBanner.classList.remove('hidden');
+          if (el.recoveryStatusText) {
+            el.recoveryStatusText.textContent = data.message || 'Video masih dalam antrean...';
+          }
+        }
+        state.hasActiveQueueJob = true;
+        
+        // Start polling for this ticket
+        pollRecoveryTicket(ticket.ticket_id, ticket.photo_id);
+        return;
+      } else {
+        // Error or expired
+        removeTicketFromStorage(ticket.ticket_id);
+      }
+    } catch(e) {
+      // Network error, skip
+      console.warn('[Recovery] Gagal cek tiket:', e.message);
+    }
+  }
+}
+
+/**
+ * Polling recovery ticket dari banner (bukan dari modal).
+ */
+function pollRecoveryTicket(ticketId, photoId) {
+  var recoveryPollId = setInterval(async function() {
+    try {
+      var response = await fetch('api/status.php?ticket=' + ticketId + '&_t=' + Date.now());
+      if (!response.ok) return;
+      var data = await response.json();
+
+      if (data.status === 'done') {
+        clearInterval(recoveryPollId);
+        state.hasActiveQueueJob = false;
+        if (el.recoveryBanner) el.recoveryBanner.classList.add('hidden');
+        
+        var downloadUrl = data.download_url || ('api/download.php?ticket=' + ticketId);
+        Swal.fire({
+          icon: 'success',
+          title: 'Video Kamu Sudah Jadi! 🎉',
+          html: 'Video Twibbon Foto ' + photoId + ' sudah selesai. Siap diunduh!',
+          confirmButtonText: 'Unduh Video Sekarang',
+          confirmButtonColor: '#162b3d'
+        }).then(function(result) {
+          if (result.isConfirmed) {
+            window.location.href = downloadUrl;
+          }
+          removeTicketFromStorage(ticketId);
+        });
+      } else if (data.status === 'error' || data.status === 'expired') {
+        clearInterval(recoveryPollId);
+        state.hasActiveQueueJob = false;
+        if (el.recoveryBanner) el.recoveryBanner.classList.add('hidden');
+        removeTicketFromStorage(ticketId);
+      } else {
+        // Update recovery banner text
+        if (el.recoveryStatusText) {
+          el.recoveryStatusText.textContent = data.message || 'Masih diproses...';
+        }
+      }
+    } catch(e) {}
+  }, 3000);
 }
 
 /* ============================================================
@@ -1112,3 +1419,4 @@ function downloadBlob(blob, filename) {
     URL.revokeObjectURL(url);
   }, 150);
 }
+

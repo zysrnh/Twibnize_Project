@@ -17,3 +17,6 @@ scratch/
 # Raw assets in root
 /*.mp4
 /*.mov
+
+# Queue storage (tiket antrean & rendered video)
+storage/

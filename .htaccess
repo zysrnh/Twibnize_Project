@@ -53,3 +53,19 @@
 
 # 5. Nonaktifkan Directory Browsing (Keamanan Folder)
 Options -Indexes
+
+# 6. Pastikan API PHP Tidak Di-Cache (Queue Polling Harus Fresh)
+<IfModule mod_headers.c>
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+# 7. Block Akses Langsung ke Storage
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^storage/ - [F,L]
+</IfModule>
+

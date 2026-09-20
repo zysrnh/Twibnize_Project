@@ -350,18 +350,45 @@
 
   </main>
 
-  <!-- PROCESSING MODAL -->
+  <!-- RECOVERY BANNER (Muncul saat maba kembali ke halaman dan ada tiket pending) -->
+  <div id="recovery-banner" class="hidden fixed top-0 left-0 right-0 z-40 bg-[#162b3d] text-white py-3 px-4 shadow-lg border-b-2 border-[#b69861]" style="margin-top:0">
+    <div class="max-w-3xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="theme-spinner" style="width:24px;height:24px;border-width:3px"></div>
+        <div>
+          <p class="text-sm font-bold">Video kamu masih diproses di server!</p>
+          <p id="recovery-status-text" class="text-[11px] text-[#b69861]">Mengecek status...</p>
+        </div>
+      </div>
+      <button id="btn-dismiss-recovery" class="text-[11px] text-slate-400 hover:text-white underline ml-3 flex-shrink-0">Tutup</button>
+    </div>
+  </div>
+
+  <!-- PROCESSING MODAL (Enhanced with Queue Position) -->
   <div id="processing-modal" class="hidden fixed inset-0 bg-[#162b3d]/85 z-50 flex items-center justify-center p-4">
     <div class="bg-white flat-card max-w-sm w-full p-6 text-center shadow-2xl border-2 border-[#b69861]">
       <div class="theme-spinner mx-auto mb-4"></div>
       <h3 id="processing-title-text" class="text-base font-extrabold text-[#162b3d] mb-1">Sedang Membuat Video...</h3>
-      <p id="processing-status-text" class="text-xs text-slate-500 mb-4">Menyatukan animasi sihir &amp; foto...</p>
+      <p id="processing-status-text" class="text-xs text-slate-500 mb-3">Mengirim foto ke server...</p>
+
+      <!-- Queue Position Badge (Muncul kalau ada antrean) -->
+      <div id="queue-position-badge" class="hidden bg-slate-50 border border-slate-200 rounded p-3 mb-3">
+        <div class="flex items-center justify-center space-x-2 mb-1">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nomor Antrean</span>
+        </div>
+        <div id="queue-position-number" class="text-3xl font-black text-[#162b3d]">#1</div>
+        <p id="queue-position-detail" class="text-[11px] text-slate-500 mt-1">Estimasi ~5 detik</p>
+      </div>
 
       <div class="flat-progress-bar mb-2">
         <div id="processing-progress-fill" class="flat-progress-fill"></div>
       </div>
       <div id="processing-percent-text" class="text-xs font-black text-[#162b3d]">0%</div>
-      <p class="text-[11px] text-slate-400 mt-3">Video diproses dengan FFmpeg High-Definition 30fps anti patah-patah.</p>
+      
+      <p class="text-[11px] text-slate-400 mt-3">
+        Video dirender FFmpeg HD 30fps di server. <br>
+        <b class="text-[#162b3d]">Boleh pindah tab / buka WA dulu,</b> video tetap diproses!
+      </p>
     </div>
   </div>
 
@@ -380,6 +407,6 @@
   </footer>
 
   <!-- App Script -->
-  <script src="assets/js/app.js?v=9.0"></script>
+  <script src="assets/js/app.js?v=10.0"></script>
 </body>
 </html>
