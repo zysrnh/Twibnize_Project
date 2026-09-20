@@ -193,7 +193,7 @@ $totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
 // 6. Jalankan FFmpeg dengan timebase synchronization (settb=AVTB)
 // Percobaan 1: Dengan Audio
 $filterWithAudio = sprintf(
-    '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad=whole_dur=%.2f[a]"',
+    '"[0:v]settb=AVTB,format=yuv420p[v0];[1:v]settb=AVTB,format=yuv420p[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad=whole_dur=%.2f[a]"',
     $crossfadeDuration,
     $fadeOffset,
     $totalDuration
@@ -216,7 +216,7 @@ exec($cmd, $output, $returnVar);
 // Jika gagal, coba render video-only dengan sinkronisasi timebase
 if ($returnVar !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath) < 1000) {
     $filterVideoOnly = sprintf(
-        '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
+        '"[0:v]settb=AVTB,format=yuv420p[v0];[1:v]settb=AVTB,format=yuv420p[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
         $crossfadeDuration,
         $fadeOffset
     );
