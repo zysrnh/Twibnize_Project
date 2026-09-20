@@ -1,6 +1,6 @@
 <?php
 /**
- * Server-Side Video Rendering Engine with Multi-Tier FFmpeg Fallback
+ * Server-Side Video Rendering Engine with Multi-Tier FFmpeg
  * Twibbon Video Maker - PKKMB SADAJIWA IDE LPKIA 2026
  * 
  * Endpoint: /api/render.php (POST)
@@ -10,7 +10,6 @@
 @ini_set('max_execution_time', '300');
 @set_time_limit(300);
 
-// CORS Headers
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
@@ -27,7 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// 1. Deteksi Path FFmpeg Binary Dinamis
 function getFfmpegBinary() {
     $candidates = [];
 
@@ -83,7 +81,7 @@ if (!$ffmpeg) {
     exit;
 }
 
-// 2. Cari File Video Template Intro
+// Cari Template Video Intro
 $introCandidates = [
     realpath(__DIR__ . '/../assets/videos/Framenaur.mp4'),
     realpath(__DIR__ . '/../assets/Framenaur.mp4'),
@@ -105,12 +103,12 @@ if (!$introVideo) {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'File video template intro tidak ditemukan.'
+        'message' => 'File video intro tidak ditemukan.'
     ]);
     exit;
 }
 
-// 3. Folder Temporary & Concurrency Lock
+// Temporary & Cache
 $cacheDir = realpath(__DIR__ . '/../assets') ? realpath(__DIR__ . '/../assets') . '/cache' : __DIR__ . '/cache';
 if (!is_dir($cacheDir)) {
     @mkdir($cacheDir, 0777, true);
@@ -164,7 +162,7 @@ $uniqueId = bin2hex(random_bytes(8));
 $tempPhotoPath = $tempDir . '/twib_in_' . $uniqueId . '.jpg';
 $tempVideoPath = $tempDir . '/twib_out_' . $uniqueId . '.mp4';
 
-// 4. Tangani Gambar Masuk
+// Ambil file foto
 $imageSaved = false;
 if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
     $imageSaved = move_uploaded_file($_FILES['image']['tmp_name'], $tempPhotoPath);
@@ -195,29 +193,18 @@ if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
 if (!$imageSaved || !file_exists($tempPhotoPath) || filesize($tempPhotoPath) < 100) {
     http_response_code(400);
     header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Gagal menerima file gambar twibbon.']);
+    echo json_encode(['success' => false, 'message' => 'Gagal menerima gambar twibbon.']);
     exit;
 }
 
-// 5. Cek Durasi & Audio Template
-function inspectMedia($ffmpegBin, $mediaPath) {
-    $info = ['duration' => 10.0, 'hasAudio' => false];
-    $cmd = escapeshellcmd($ffmpegBin) . ' -i ' . escapeshellarg($mediaPath) . ' 2>&1';
-    $output = @shell_exec($cmd);
-    if ($output) {
-        if (preg_match('/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/', $output, $m)) {
-            $info['duration'] = ($m[1] * 3600) + ($m[2] * 60) + floatval($m[3]);
-        }
-        if (stripos($output, 'Audio:') !== false || stripos($output, 'Stream #0:1') !== false) {
-            $info['hasAudio'] = true;
-        }
-    }
-    return $info;
+// Deteksi durasi video template
+$introDuration = 10.0;
+$cmdProbe = escapeshellcmd($ffmpeg) . ' -i ' . escapeshellarg($introVideo) . ' 2>&1';
+$probeOutput = @shell_exec($cmdProbe);
+if ($probeOutput && preg_match('/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/', $probeOutput, $m)) {
+    $introDuration = ($m[1] * 3600) + ($m[2] * 60) + floatval($m[3]);
 }
-
-$mediaInfo = inspectMedia($ffmpeg, $introVideo);
-$introDuration = max(2.0, floatval($mediaInfo['duration']));
-$hasAudio = $mediaInfo['hasAudio'];
+if ($introDuration < 2.0) $introDuration = 10.0;
 
 $holdDuration = isset($_POST['holdDuration']) ? floatval($_POST['holdDuration']) : 5.0;
 if ($holdDuration <= 0 || $holdDuration > 30) $holdDuration = 5.0;
@@ -228,88 +215,60 @@ if ($introDuration <= $crossfadeDuration) {
 }
 $fadeOffset = max(0.0, round($introDuration - $crossfadeDuration, 2));
 $photoDuration = round($holdDuration + $crossfadeDuration, 2);
-$totalDuration = round($fadeOffset + $photoDuration, 2);
 
 $renderSuccess = false;
 $allOutputs = [];
 
-// TIER 1: Crossfade HD Video + Audio Filter
-$filterTier1 = sprintf(
-    '[0:v]scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30,settb=1/30,format=yuv420p[v0];' .
-    '[1:v]scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30,settb=1/30,format=yuv420p[v1];' .
-    '[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]' .
-    ($hasAudio ? ';[0:a]apad=whole_dur=%.2f[a]' : ''),
+// TIER 1: Ultra-Smooth Crossfade HD
+$filterXfade = sprintf(
+    '[0:v]fps=30,scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,settb=AVTB[v0];' .
+    '[1:v]fps=30,scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,settb=AVTB[v1];' .
+    '[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]',
     $crossfadeDuration,
-    $fadeOffset,
-    $totalDuration
+    $fadeOffset
 );
 
-$mapAudioFlag = $hasAudio ? '-map "[a]" -c:a aac -b:a 128k -ar 44100' : '';
-$cmdTier1 = sprintf(
-    '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" %s -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -r 30 -movflags +faststart %s 2>&1',
+$cmdXfade = sprintf(
+    '%s -y -i %s -framerate 30 -loop 1 -t %.2f -i %s -filter_complex %s -map "[v]" -c:v libx264 -pix_fmt yuv420p -preset faster -crf 23 -r 30 -movflags +faststart %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($introVideo),
     $photoDuration,
     escapeshellarg($tempPhotoPath),
-    escapeshellarg($filterTier1),
-    $mapAudioFlag,
+    escapeshellarg($filterXfade),
     escapeshellarg($tempVideoPath)
 );
 
-$outputTier1 = [];
-$returnTier1 = 0;
-exec($cmdTier1, $outputTier1, $returnTier1);
-$allOutputs['tier1'] = $outputTier1;
+$out1 = [];
+$ret1 = 0;
+exec($cmdXfade, $out1, $ret1);
+$allOutputs['tier1'] = $out1;
 
-if ($returnTier1 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000) {
+if ($ret1 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000) {
     $renderSuccess = true;
 }
 
-// TIER 2: Seamless Concat Transition Filter (100% Compatible di semua versi FFmpeg)
+// TIER 2: Fast Concat Transition
 if (!$renderSuccess) {
-    $filterTier2 = sprintf(
-        '[0:v]scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30,format=yuv420p[v0];' .
-        '[1:v]scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1,fps=30,format=yuv420p[v1];' .
-        '[v0][v1]concat=n=2:v=1:a=0[v]'
-    );
+    $filterConcat = '[0:v]fps=30,scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1[v0];' .
+                    '[1:v]fps=30,scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350,setsar=1[v1];' .
+                    '[v0][v1]concat=n=2:v=1:a=0[v]';
 
-    $cmdTier2 = sprintf(
-        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 23 -r 30 -movflags +faststart %s 2>&1',
+    $cmdConcat = sprintf(
+        '%s -y -i %s -framerate 30 -loop 1 -t %.2f -i %s -filter_complex %s -map "[v]" -c:v libx264 -pix_fmt yuv420p -preset faster -crf 23 -r 30 -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         $holdDuration,
         escapeshellarg($tempPhotoPath),
-        escapeshellarg($filterTier2),
+        escapeshellarg($filterConcat),
         escapeshellarg($tempVideoPath)
     );
 
-    $outputTier2 = [];
-    $returnTier2 = 0;
-    exec($cmdTier2, $outputTier2, $returnTier2);
-    $allOutputs['tier2'] = $outputTier2;
+    $out2 = [];
+    $ret2 = 0;
+    exec($cmdConcat, $out2, $ret2);
+    $allOutputs['tier2'] = $out2;
 
-    if ($returnTier2 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000) {
-        $renderSuccess = true;
-    }
-}
-
-// TIER 3: Simple Safe Fast Encode
-if (!$renderSuccess) {
-    $cmdTier3 = sprintf(
-        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex "[0:v]scale=1080:1350[v0];[1:v]scale=1080:1350[v1];[v0][v1]concat=n=2:v=1[v]" -map "[v]" -c:v mpeg4 -q:v 3 -r 30 %s 2>&1',
-        escapeshellcmd($ffmpeg),
-        escapeshellarg($introVideo),
-        $holdDuration,
-        escapeshellarg($tempPhotoPath),
-        escapeshellarg($tempVideoPath)
-    );
-
-    $outputTier3 = [];
-    $returnTier3 = 0;
-    exec($cmdTier3, $outputTier3, $returnTier3);
-    $allOutputs['tier3'] = $outputTier3;
-
-    if ($returnTier3 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000) {
+    if ($ret2 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000) {
         $renderSuccess = true;
     }
 }
@@ -322,13 +281,12 @@ if (!$renderSuccess) {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'Gagal merender video dengan FFmpeg di server.',
+        'message' => 'Gagal merender video di server.',
         'debug' => $allOutputs
     ]);
     exit;
 }
 
-// 6. Berhasil! Kirim Video MP4 ke Browser
 @unlink($tempPhotoPath);
 
 $filename = 'Twibbon_PKKMB_LPKIA_' . date('Ymd_His') . '.mp4';
@@ -338,8 +296,6 @@ header('Content-Type: video/mp4');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Content-Length: ' . $fileSize);
 header('Cache-Control: no-cache, no-store, must-revalidate');
-header('Pragma: no-cache');
-header('Expires: 0');
 
 $fp = @fopen($tempVideoPath, 'rb');
 if ($fp) {
