@@ -198,7 +198,7 @@ $totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
 // Langkah 1: Render Foto menjadi Video MP4 Mini (5.6 detik)
 // Sangat cepat (~0.2 detik) dan menghasilkan stream video MP4 valid dengan framerate 30fps
 $cmdClip = sprintf(
-    '%s -y -loop 1 -framerate 30 -i %s -t %.2f -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 %s 2>&1',
+    '%s -y -loop 1 -framerate 30 -i %s -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,format=yuv420p" -t %.2f -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($tempPhotoPath),
     $photoDuration,
@@ -230,7 +230,7 @@ $filterMethod1 = sprintf(
 );
 
 $cmdMethod1 = sprintf(
-    '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
+    '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($introVideo),
     escapeshellarg($tempClipPath),
@@ -255,7 +255,7 @@ if (!$renderSuccess) {
     );
 
     $cmdMethod2 = sprintf(
-        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         escapeshellarg($tempClipPath),
@@ -275,7 +275,7 @@ if (!$renderSuccess) {
     $filterMethod3 = '"[0:v]setsar=1[v0];[1:v]setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]"';
 
     $cmdMethod3 = sprintf(
-        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         escapeshellarg($tempClipPath),
