@@ -190,65 +190,92 @@ $fadeOffset = round($introDuration - $crossfadeDuration, 2); // 9.4s
 $photoDuration = round($holdDuration + $crossfadeDuration, 2); // 5.6s
 $totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
 
-// 6. Jalankan FFmpeg dengan timebase synchronization (settb=AVTB)
-// Percobaan 1: Dengan Audio
-$filterWithAudio = sprintf(
-    '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad=whole_dur=%.2f[a]"',
+// 6. Jalankan FFmpeg dengan Multi-Level Fallback Engine
+// Method 1: High-Definition XFade Transition + Audio Synchronization
+$filterMethod1 = sprintf(
+    '"[0:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v0];[1:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad[a]"',
     $crossfadeDuration,
-    $fadeOffset,
-    $totalDuration
+    $fadeOffset
 );
 
-$cmd = sprintf(
-    '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -c:a aac -b:a 128k -ar 44100 -movflags +faststart %s 2>&1',
+$cmdMethod1 = sprintf(
+    '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($introVideo),
     $photoDuration,
     escapeshellarg($tempPhotoPath),
-    $filterWithAudio,
+    $filterMethod1,
+    $totalDuration,
     escapeshellarg($tempVideoPath)
 );
 
-$output = [];
-$returnVar = 0;
-exec($cmd, $output, $returnVar);
+$output1 = [];
+$returnVar1 = 0;
+exec($cmdMethod1, $output1, $returnVar1);
 
-// Jika gagal, coba render video-only dengan sinkronisasi timebase
-if ($returnVar !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath) < 1000) {
-    $filterVideoOnly = sprintf(
-        '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
+$renderSuccess = ($returnVar1 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000);
+
+// Method 2: XFade Transition Video-Only (jika audio stream pada input 0 bermasalah)
+$output2 = [];
+if (!$renderSuccess) {
+    $filterMethod2 = sprintf(
+        '"[0:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v0];[1:v]scale=1080:1350,setsar=1,format=yuv420p,settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
         $crossfadeDuration,
         $fadeOffset
     );
 
-    $cmdFallback = sprintf(
-        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -movflags +faststart %s 2>&1',
+    $cmdMethod2 = sprintf(
+        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         $photoDuration,
         escapeshellarg($tempPhotoPath),
-        $filterVideoOnly,
+        $filterMethod2,
+        $totalDuration,
         escapeshellarg($tempVideoPath)
     );
 
-    $outputFallback = [];
-    $returnVarFallback = 0;
-    exec($cmdFallback, $outputFallback, $returnVarFallback);
+    $returnVar2 = 0;
+    exec($cmdMethod2, $output2, $returnVar2);
+    $renderSuccess = ($returnVar2 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000);
+}
 
-    if ($returnVarFallback !== 0 || !file_exists($tempVideoPath) || filesize($tempVideoPath) < 1000) {
-        // Hapus file temporary photo
-        @unlink($tempPhotoPath);
-        @unlink($tempVideoPath);
+// Method 3: Concat Filter Fallback (dijamin support 100% di semua versi FFmpeg lama/baru)
+$output3 = [];
+if (!$renderSuccess) {
+    $filterMethod3 = '"[0:v]scale=1080:1350,setsar=1,format=yuv420p[v0];[1:v]scale=1080:1350,setsar=1,format=yuv420p[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]"';
 
-        http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => false,
-            'message' => 'Gagal merender video dengan FFmpeg.',
-            'debug' => array_merge($output, $outputFallback)
-        ]);
-        exit;
-    }
+    $cmdMethod3 = sprintf(
+        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        escapeshellcmd($ffmpeg),
+        escapeshellarg($introVideo),
+        $holdDuration,
+        escapeshellarg($tempPhotoPath),
+        $filterMethod3,
+        $introDuration + $holdDuration,
+        escapeshellarg($tempVideoPath)
+    );
+
+    $returnVar3 = 0;
+    exec($cmdMethod3, $output3, $returnVar3);
+    $renderSuccess = ($returnVar3 === 0 && file_exists($tempVideoPath) && filesize($tempVideoPath) > 1000);
+}
+
+if (!$renderSuccess) {
+    @unlink($tempPhotoPath);
+    @unlink($tempVideoPath);
+
+    $allLogs = array_filter(array_merge($output1, $output2, $output3));
+    $lastErrorLines = array_slice($allLogs, -4);
+
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'message' => 'Gagal merender video: ' . implode(' | ', $lastErrorLines),
+        'debug' => $allLogs
+    ]);
+    exit;
 }
 
 // 7. Berhasil! Kirim video MP4 ke browser pengguna
