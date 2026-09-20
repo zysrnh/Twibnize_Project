@@ -1,9 +1,6 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v10.1 - Direct Server-Side FFmpeg Engine + Concurrency Limiter (Anti Server-Down)
- * 
- * Semua video dirender 100% di server oleh FFmpeg High-Definition 30fps.
- * HP maba cuma mengirim foto JPEG dan langsung menerima file MP4 video jadi.
+ * v9.0 - Multi-Photo (1-3 Videos) with Clean Single-Card Upload & Server Concurrency Limiter
  */
 
 // Global App State
@@ -952,7 +949,6 @@ async function startBatchVideoExport(specificIndex) {
 
   var total = targets.length;
   var successCount = 0;
-  var lastErrorMessage = '';
 
   for (var i = 0; i < total; i++) {
     var photo = targets[i];
@@ -968,11 +964,10 @@ async function startBatchVideoExport(specificIndex) {
       await renderSinglePhotoVideo(photo, currentNum, total);
       successCount++;
       if (i < total - 1) {
-        await new Promise(function(r) { setTimeout(r, 400); });
+        await new Promise(function(r) { setTimeout(r, 500); });
       }
     } catch (err) {
       console.error('Gagal render video foto ' + photo.id + ':', err);
-      lastErrorMessage = err.message || 'Kendala koneksi ke server';
     }
   }
 
@@ -991,14 +986,14 @@ async function startBatchVideoExport(specificIndex) {
     Swal.fire({
       icon: 'warning',
       title: 'Sebagian Video Selesai',
-      html: '<b>' + successCount + ' dari ' + total + ' video</b> berhasil diunduh.<br><small class="text-slate-400">Pesan: ' + lastErrorMessage + '</small>',
+      html: '<b>' + successCount + ' dari ' + total + ' video</b> berhasil diunduh.',
       confirmButtonColor: '#162b3d'
     });
   } else {
     Swal.fire({
       icon: 'error',
       title: 'Gagal Membuat Video',
-      text: lastErrorMessage || 'Terjadi kendala saat memproses video ke server. Silakan coba kembali.',
+      text: 'Terjadi kendala saat memproses video ke server. Silakan coba kembali.',
       confirmButtonColor: '#162b3d'
     });
   }
@@ -1008,7 +1003,6 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
   return new Promise(function(resolve, reject) {
     updateExportProgress(5, 'Menyiapkan gambar twibbon (Foto ' + photo.id + ')...');
 
-    // 1. Buat composite canvas (foto cropped + frame PNG)
     var exportCanvas = document.createElement('canvas');
     exportCanvas.width = state.canvasSize.width;
     exportCanvas.height = state.canvasSize.height;
@@ -1020,27 +1014,25 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
       ctx.drawImage(state.processedFrameCanvas || state.frameImg, 0, 0, exportCanvas.width, exportCanvas.height);
     }
 
-    // 2. Convert ke JPEG blob berkualitas tinggi (0.95)
     exportCanvas.toBlob(async function(blob) {
       if (!blob) {
         return reject(new Error('Gagal membuat blob gambar'));
       }
 
-      updateExportProgress(15, 'Mengirim ke server (Foto ' + photo.id + ')...');
+      updateExportProgress(15, 'Mengirim ke antrean server (Foto ' + photo.id + ')...');
 
       var formData = new FormData();
       formData.append('image', blob, 'twibbon_composite_' + photo.id + '.jpg');
       formData.append('holdDuration', state.holdPhotoDuration || 5);
 
-      // Simulated smooth progress ticker saat FFmpeg me-render di server
       var curPercent = 15;
       var timer = setInterval(function() {
-        if (curPercent < 88) {
-          curPercent += Math.floor(Math.random() * 4) + 2;
-          if (curPercent > 88) curPercent = 88;
-          updateExportProgress(curPercent, 'Server sedang merender Video ' + currentIdx + ' dari ' + totalCount + ' (HD 30fps)...');
+        if (curPercent < 85) {
+          curPercent += Math.floor(Math.random() * 5) + 3;
+          if (curPercent > 85) curPercent = 85;
+          updateExportProgress(curPercent, 'Server sedang merender Video ' + currentIdx + ' dari ' + totalCount + ' (30fps HD)...');
         }
-      }, 350);
+      }, 400);
 
       try {
         var response = await fetch('api/render.php', {
@@ -1052,26 +1044,17 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
 
         if (!response.ok) {
           var errData = {};
-          try { 
-            errData = await response.json(); 
-          } catch(e) {
-            var textErr = await response.text();
-            errData = { message: textErr || ('Server HTTP Error ' + response.status) };
-          }
-          throw new Error(errData.message || ('Server error HTTP ' + response.status));
+          try { errData = await response.json(); } catch(e) {}
+          throw new Error(errData.message || ('Server error ' + response.status));
         }
 
         updateExportProgress(92, 'Mengunduh file MP4 Video ' + photo.id + '...');
 
         var videoBlob = await response.blob();
-        if (!videoBlob || videoBlob.size < 1000) {
-          throw new Error('Hasil file video dari server kosong.');
-        }
-
         var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
         downloadBlob(videoBlob, filename);
 
-        updateExportProgress(100, 'Selesai Video ' + photo.id + '! ✅');
+        updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
         setTimeout(resolve, 300);
 
       } catch (err) {
@@ -1129,5 +1112,3 @@ function downloadBlob(blob, filename) {
     URL.revokeObjectURL(url);
   }, 150);
 }
-
-
