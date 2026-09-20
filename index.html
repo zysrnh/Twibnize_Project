@@ -41,11 +41,11 @@
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
-  <!-- MP4 Muxer for In-Browser Video Generation -->
+  <!-- MP4 Muxer for High-Performance 30FPS In-Browser Video Generation -->
   <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.4/build/mp4-muxer.min.js"></script>
   
   <!-- Custom Flat CSS -->
-  <link rel="stylesheet" href="assets/css/style.css?v=9.3">
+  <link rel="stylesheet" href="assets/css/style.css?v=9.4">
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between select-none font-sans">
 
@@ -91,13 +91,13 @@
   <main class="max-w-3xl w-full mx-auto p-3 sm:p-5 flex-1 flex flex-col justify-center">
 
     <!-- STEP 1: UPLOAD PHOTO SECTION -->
-    <div id="upload-dropzone" class="flat-card p-5 sm:p-8 bg-white">
+    <div id="upload-dropzone" class="flat-card p-4 sm:p-8 bg-white">
       <!-- Hidden file inputs -->
       <input type="file" id="file-input" accept="image/*" multiple class="hidden">
       <input type="file" id="slot-input-extra" accept="image/*" class="hidden">
       <input type="file" id="slot-replace-input" accept="image/*" class="hidden">
 
-      <!-- 1. INITIAL CLEAN SINGLE CARD (Tampilan Awal Persis Semula) -->
+      <!-- 1. INITIAL CLEAN SINGLE CARD (Tampilan Awal) -->
       <div id="upload-initial-state" class="text-center py-4 sm:py-6">
         <div class="mx-auto w-16 h-16 bg-[#162b3d] border-2 border-[#b69861] flex items-center justify-center rounded mb-4 text-[#b69861] shadow-sm cursor-pointer" onclick="document.getElementById('file-input').click()">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,15 +105,15 @@
           </svg>
         </div>
 
-        <h2 class="text-lg sm:text-xl font-extrabold text-[#162b3d] mb-1">Upload Foto Mahasiswa Baru</h2>
-        <p class="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-6">
+        <h2 class="text-base sm:text-xl font-extrabold text-[#162b3d] mb-1">Upload Foto Mahasiswa Baru</h2>
+        <p class="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-5">
           Pilih foto terbaikmu untuk dimasukkan ke dalam Twibbon Animasi Video PKKMB 2026.
         </p>
 
         <!-- Main Action Buttons -->
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5 max-w-md mx-auto">
-          <button type="button" onclick="document.getElementById('file-input').click()" class="flat-btn flat-btn-primary px-6 py-3 text-sm tracking-wide shadow-sm w-full sm:w-auto">
-            <svg class="w-5 h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto">
+          <button type="button" onclick="document.getElementById('file-input').click()" class="flat-btn flat-btn-primary px-5 py-3 text-xs sm:text-sm tracking-wide shadow-sm w-full sm:w-auto">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             Pilih Dari Galeri HP / File
@@ -127,7 +127,7 @@
           </button>
         </div>
 
-        <div class="mt-5 flex items-center justify-center space-x-2 text-[11px] text-slate-400">
+        <div class="mt-4 flex items-center justify-center space-x-2 text-[11px] text-slate-400">
           <span>JPG, PNG, WEBP</span>
           <span>&bull;</span>
           <span class="text-[#830106] font-semibold">Maks 15MB</span>
@@ -136,9 +136,9 @@
         </div>
       </div>
 
-      <!-- 2. SELECTED PHOTOS LIST VIEW (Tampil Ketika Foto Sudah Dipilih) -->
+      <!-- 2. SELECTED PHOTOS LIST VIEW (Responsif Penuh di Semua Layar HP) -->
       <div id="upload-selected-state" class="hidden">
-        <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-200 pb-3 mb-4">
           <div>
             <h3 class="font-extrabold text-sm sm:text-base text-[#162b3d]">
               Foto Terpilih (<span id="photo-count-badge">0</span> Foto)
@@ -146,13 +146,15 @@
             <p class="text-[11px] text-slate-500">Foto siap diatur posisinya untuk twibbon video.</p>
           </div>
 
-          <!-- Button Tambah Foto (Hanya muncul jika < 3 foto) -->
-          <button type="button" id="btn-add-more-photos" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs font-bold text-[#162b3d] border-[#b69861] hover:bg-[#b69861] hover:text-white">
-            <svg class="w-3.5 h-3.5 mr-1 text-[#b69861] group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            + Tambah Foto (<span id="remaining-count-badge">2</span> sisa)
-          </button>
+          <!-- Button Tambah Foto (Responsif & Rapi) -->
+          <div class="flex items-center">
+            <button type="button" id="btn-add-more-photos" class="flat-btn flat-btn-outline px-3 py-1.5 text-xs font-bold text-[#162b3d] border-[#b69861] hover:bg-[#b69861] hover:text-white whitespace-nowrap">
+              <svg class="w-3.5 h-3.5 mr-1 text-[#b69861] inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              <span>+ Tambah Foto (<span id="remaining-count-badge">2</span> sisa)</span>
+            </button>
+          </div>
         </div>
 
         <!-- Dynamic Grid of Chosen Photos -->
@@ -165,7 +167,7 @@
           <button type="button" id="btn-reset-all-photos" class="text-xs text-slate-400 hover:text-[#830106] font-medium underline py-1">
             Hapus &amp; Pilih Ulang Semua
           </button>
-          <button id="btn-proceed-crop" class="flat-btn flat-btn-primary px-7 py-3 text-xs sm:text-sm w-full sm:w-auto shadow-sm">
+          <button id="btn-proceed-crop" class="flat-btn flat-btn-primary px-6 py-3 text-xs sm:text-sm w-full sm:w-auto shadow-sm whitespace-nowrap">
             Lanjut Atur Posisi Foto (<span id="btn-crop-count">1</span> Foto) &rarr;
           </button>
         </div>
@@ -185,7 +187,7 @@
         </label>
       </div>
 
-      <!-- CROPPER TAB BAR (HANYA MUNCUL JIKA LEBIH DARI 1 FOTO) -->
+      <!-- CROPPER TAB BAR -->
       <div id="cropper-tabs-container" class="hidden flex items-center space-x-2 mb-3 border-b border-slate-200 pb-2">
         <button type="button" id="crop-tab-1" class="px-3 py-1.5 text-xs font-bold rounded flex items-center bg-[#162b3d] text-white">
           <span>Foto 1</span>
@@ -202,7 +204,6 @@
       <!-- CROPPER VIEWPORT (Full Twibbonize Free Move 4:5) -->
       <div class="relative w-full aspect-[4/5] bg-[#0f172a] overflow-hidden border-2 border-[#162b3d] mb-2 max-w-[420px] mx-auto cursor-grab active:cursor-grabbing rounded">
         <img id="cropper-image" src="" alt="Cropper Target" class="max-w-full block">
-        <!-- Overlay Frame Guide (Auto Transparent Center) -->
         <img id="cropper-frame-overlay" src="assets/images/twibon.svg" alt="Frame Guide" class="crop-frame-guide">
       </div>
 
@@ -270,7 +271,7 @@
         </button>
       </div>
 
-      <!-- PREVIEW TAB SELECTOR (HANYA MUNCUL JIKA LEBIH DARI 1 FOTO) -->
+      <!-- PREVIEW TAB SELECTOR -->
       <div id="preview-tabs-container" class="hidden flex items-center space-x-2 mb-3 border-b border-slate-200 pb-2 max-w-[460px] mx-auto">
         <button type="button" id="prev-tab-1" class="px-3 py-1.5 text-xs font-bold rounded flex items-center bg-[#162b3d] text-white">
           <span>Lihat Video 1</span>
@@ -318,7 +319,6 @@
 
       <!-- DOWNLOAD BUTTONS -->
       <div class="max-w-[460px] mx-auto space-y-2.5 pt-3 border-t border-slate-200">
-        <!-- BATCH DOWNLOAD ALL / SINGLE DOWNLOAD BUTTON -->
         <button id="btn-download-all-videos" class="flat-btn flat-btn-primary w-full py-3.5 text-sm font-black shadow-md">
           <svg class="w-5 h-5 mr-2 text-[#b69861]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -326,7 +326,6 @@
           <span id="btn-download-all-text">Download Video Twibbon (MP4)</span>
         </button>
 
-        <!-- INDIVIDUAL VIDEO BUTTONS (GRID) (Hanya muncul jika > 1 foto) -->
         <div id="individual-download-grid" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-2">
           <button id="btn-dl-video-1" class="flat-btn flat-btn-outline py-2 text-xs font-bold">
             Unduh Video 1
@@ -379,7 +378,7 @@
     </p>
   </footer>
 
-  <!-- App Script with Cache Busting v9.3 -->
-  <script src="assets/js/app.js?v=9.3"></script>
+  <!-- App Script with Cache Busting v9.4 -->
+  <script src="assets/js/app.js?v=9.4"></script>
 </body>
 </html>

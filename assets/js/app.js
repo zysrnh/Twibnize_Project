@@ -1,6 +1,6 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v9.3 - Multi-Photo with Frame-Synchronized HD Engine (No Black Screens, Rock-Solid 30fps)
+ * v9.4 - Mobile-Optimized Responsive UI & Ultra-Smooth Deterministic 30FPS Engine
  */
 
 // Global App State
@@ -531,22 +531,22 @@ function renderSelectedPhotosUI() {
     state.photos.forEach(function(photo, idx) {
       var isPrimary = idx === 0;
       var card = document.createElement('div');
-      card.className = 'border border-slate-200 rounded p-3 bg-slate-50 flex items-center sm:flex-col sm:items-center text-left sm:text-center relative transition-all shadow-sm';
+      card.className = 'border border-slate-200 rounded p-3 bg-slate-50 flex items-center text-left relative transition-all shadow-sm';
 
       var badgeText = isPrimary ? 'Foto 1 (Utama)' : ('Foto ' + (idx + 1));
       var badgeColor = isPrimary ? 'bg-[#162b3d] text-[#b69861]' : 'bg-slate-700 text-white';
 
       card.innerHTML = `
-        <div class="relative w-16 h-20 sm:w-24 sm:h-28 flex-shrink-0 border border-slate-300 rounded overflow-hidden bg-black shadow-sm mr-3 sm:mr-0 sm:mb-2">
+        <div class="relative w-16 h-20 flex-shrink-0 border border-slate-300 rounded overflow-hidden bg-black shadow-sm mr-3">
           <img src="${photo.rawSrc}" class="w-full h-full object-cover">
           <span class="absolute top-1 left-1 text-[9px] font-black px-1.5 py-0.5 rounded ${badgeColor} shadow">
             #${idx + 1}
           </span>
         </div>
-        <div class="flex-1 min-w-0 sm:w-full">
+        <div class="flex-1 min-w-0 pr-1">
           <span class="block text-xs font-black text-[#162b3d] truncate mb-0.5">${badgeText}</span>
-          <span class="block text-[11px] text-slate-500 truncate mb-2 max-w-[140px] sm:max-w-none">${photo.fileName || ('foto_' + (idx + 1))}</span>
-          <div class="flex items-center space-x-1.5 sm:justify-center">
+          <span class="block text-[11px] text-slate-500 truncate mb-2 max-w-[150px]">${photo.fileName || ('foto_' + (idx + 1))}</span>
+          <div class="flex items-center space-x-2">
             <button type="button" class="btn-card-replace text-[11px] font-bold text-[#162b3d] bg-white border border-slate-300 px-2.5 py-1 rounded hover:bg-slate-100 transition-all">
               Ganti
             </button>
@@ -585,14 +585,14 @@ function renderSelectedPhotosUI() {
     if (count < 3) {
       var nextSlotNum = count + 1;
       var addSlot = document.createElement('div');
-      addSlot.className = 'border-2 border-dashed border-slate-300 hover:border-[#b69861] p-3 text-center rounded bg-white flex flex-col items-center justify-center min-h-[120px] sm:min-h-[170px] cursor-pointer transition-all';
+      addSlot.className = 'border-2 border-dashed border-slate-300 hover:border-[#b69861] p-3 text-center rounded bg-white flex flex-col items-center justify-center min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all';
       addSlot.innerHTML = `
-        <div class="w-9 h-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-black text-xs mb-1.5 border border-slate-200">
+        <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-black text-xs mb-1 border border-slate-200">
           +
         </div>
         <span class="text-xs font-bold text-[#162b3d]">Tambah Foto ${nextSlotNum}</span>
         <span class="text-[10px] text-slate-400 mt-0.5">Bisa sampai 3 foto</span>
-        <span class="mt-2 text-[11px] font-bold text-[#b69861] bg-white border border-[#b69861] px-2.5 py-0.5 rounded shadow-sm hover:bg-[#b69861] hover:text-white transition-all">+ Pilih</span>
+        <span class="mt-1.5 text-[11px] font-bold text-[#b69861] bg-white border border-[#b69861] px-2.5 py-0.5 rounded shadow-sm hover:bg-[#b69861] hover:text-white transition-all">+ Pilih</span>
       `;
       addSlot.addEventListener('click', function() {
         if (el.slotInputExtra) el.slotInputExtra.click();
@@ -1060,11 +1060,11 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
 }
 
 /**
- * Helper to ensure a video element reliably seeks and renders a specific frame
+ * Accurate Video Frame Seeker
  */
 function seekVideoFrame(video, time) {
   return new Promise(function(resolve) {
-    var timeout = setTimeout(resolve, 120);
+    var timeout = setTimeout(resolve, 140);
     function onSeeked() {
       clearTimeout(timeout);
       video.removeEventListener('seeked', onSeeked);
@@ -1076,7 +1076,7 @@ function seekVideoFrame(video, time) {
 }
 
 /**
- * High-Quality Synchronized Browser Video Engine (Guaranteed Visible Intro Animation + 30fps)
+ * Deterministic In-Browser Video Engine (Ultra-Smooth 30 FPS on all Android / iOS devices)
  */
 async function renderSynchronizedBrowserVideo(photo, compositeCanvas, currentIdx, totalCount) {
   var width = 1080;
@@ -1096,7 +1096,6 @@ async function renderSynchronizedBrowserVideo(photo, compositeCanvas, currentIdx
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Setup synchronous video instance
   var tempVideo = document.createElement('video');
   tempVideo.src = state.introVideo.src;
   tempVideo.crossOrigin = 'anonymous';
@@ -1112,101 +1111,121 @@ async function renderSynchronizedBrowserVideo(photo, compositeCanvas, currentIdx
     setTimeout(res, 2500);
   });
 
-  // Pastikan frame 0 ter-load
-  await seekVideoFrame(tempVideo, 0.05);
+  await seekVideoFrame(tempVideo, 0.04);
 
-  // METODE 1: WebCodecs + Mp4Muxer (Deterministic Seeked Frame-by-Frame, Exact 30fps HD MP4)
+  // METODE 1: WebCodecs + Mp4Muxer (Hardware AVC H.264 Encoder, Exact 30fps)
   if (window.VideoEncoder && window.Mp4Muxer && window.VideoFrame) {
-    try {
-      updateExportProgress(20, 'Menyiapkan Hardware H.264 30fps (Video ' + currentIdx + ')...');
+    var supportedCodec = null;
+    var codecCandidates = ['avc1.42001f', 'avc1.420028', 'avc1.4d002a', 'avc1.640028'];
 
-      var muxer = new Mp4Muxer.Muxer({
-        target: new Mp4Muxer.ArrayBufferTarget(),
-        video: {
-          codec: 'avc',
+    for (var i = 0; i < codecCandidates.length; i++) {
+      try {
+        var support = await VideoEncoder.isConfigSupported({
+          codec: codecCandidates[i],
           width: width,
-          height: height
-        },
-        fastStart: 'in-memory'
-      });
-
-      var encoder = new VideoEncoder({
-        output: function(chunk, meta) {
-          muxer.addVideoChunk(chunk, meta);
-        },
-        error: function(e) {
-          console.error('WebCodecs Error:', e);
+          height: height,
+          bitrate: 6000000,
+          framerate: fps
+        });
+        if (support && support.supported) {
+          supportedCodec = codecCandidates[i];
+          break;
         }
-      });
+      } catch (e) {}
+    }
 
-      encoder.configure({
-        codec: 'avc1.420028',
-        width: width,
-        height: height,
-        bitrate: 6000000,
-        framerate: fps
-      });
+    if (supportedCodec) {
+      try {
+        updateExportProgress(20, 'Menyiapkan Hardware H.264 30fps (Video ' + currentIdx + ')...');
 
-      for (var f = 0; f < totalFrames; f++) {
-        var time = f / fps;
-
-        if (time < introDuration) {
-          var seekTarget = Math.min(time, Math.max(0, introDuration - 0.04));
-          await seekVideoFrame(tempVideo, seekTarget);
-        }
-
-        ctx.fillStyle = '#162b3d';
-        ctx.fillRect(0, 0, width, height);
-
-        if (time < fadeStartTime) {
-          drawCoverMedia(ctx, tempVideo, width, height);
-        } else if (time >= fadeStartTime && time < introDuration) {
-          drawCoverMedia(ctx, tempVideo, width, height);
-          var progress = (time - fadeStartTime) / crossfadeDuration;
-          ctx.save();
-          ctx.globalAlpha = Math.min(1, Math.max(0, progress));
-          ctx.drawImage(compositeCanvas, 0, 0, width, height);
-          ctx.restore();
-        } else {
-          ctx.drawImage(compositeCanvas, 0, 0, width, height);
-        }
-
-        var frameDurationMicro = Math.round((1 / fps) * 1000000);
-        var timestampMicro = Math.round(time * 1000000);
-
-        var videoFrame = new VideoFrame(canvas, {
-          timestamp: timestampMicro,
-          duration: frameDurationMicro
+        var muxer = new Mp4Muxer.Muxer({
+          target: new Mp4Muxer.ArrayBufferTarget(),
+          video: {
+            codec: 'avc',
+            width: width,
+            height: height
+          },
+          fastStart: 'in-memory'
         });
 
-        var isKeyFrame = f % 60 === 0;
-        encoder.encode(videoFrame, { keyFrame: isKeyFrame });
-        videoFrame.close();
+        var encoder = new VideoEncoder({
+          output: function(chunk, meta) {
+            muxer.addVideoChunk(chunk, meta);
+          },
+          error: function(e) {
+            console.error('WebCodecs Error:', e);
+          }
+        });
 
-        if (f % 5 === 0) {
-          var pct = Math.min(95, Math.floor(20 + (f / totalFrames) * 75));
-          updateExportProgress(pct, 'Merender frame ' + (f + 1) + ' / ' + totalFrames + ' (30fps HD)...');
-          await new Promise(function(r) { setTimeout(r, 0); });
+        encoder.configure({
+          codec: supportedCodec,
+          width: width,
+          height: height,
+          bitrate: 6000000,
+          framerate: fps
+        });
+
+        for (var f = 0; f < totalFrames; f++) {
+          var time = f / fps;
+
+          if (time < introDuration) {
+            var targetSeek = Math.min(time, Math.max(0, introDuration - 0.04));
+            await seekVideoFrame(tempVideo, targetSeek);
+          }
+
+          ctx.fillStyle = '#162b3d';
+          ctx.fillRect(0, 0, width, height);
+
+          if (time < fadeStartTime) {
+            drawCoverMedia(ctx, tempVideo, width, height);
+          } else if (time >= fadeStartTime && time < introDuration) {
+            drawCoverMedia(ctx, tempVideo, width, height);
+            var progress = (time - fadeStartTime) / crossfadeDuration;
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, Math.max(0, progress));
+            ctx.drawImage(compositeCanvas, 0, 0, width, height);
+            ctx.restore();
+          } else {
+            ctx.drawImage(compositeCanvas, 0, 0, width, height);
+          }
+
+          var frameDurationMicro = Math.round((1 / fps) * 1000000);
+          var timestampMicro = Math.round(time * 1000000);
+
+          var videoFrame = new VideoFrame(canvas, {
+            timestamp: timestampMicro,
+            duration: frameDurationMicro
+          });
+
+          var isKeyFrame = f % 60 === 0;
+          encoder.encode(videoFrame, { keyFrame: isKeyFrame });
+          videoFrame.close();
+
+          if (f % 6 === 0) {
+            var pct = Math.min(95, Math.floor(20 + (f / totalFrames) * 75));
+            updateExportProgress(pct, 'Merender frame ' + (f + 1) + ' / ' + totalFrames + ' (30fps HD)...');
+            await new Promise(function(r) { setTimeout(r, 0); });
+          }
         }
+
+        updateExportProgress(96, 'Menyelesaikan file MP4...');
+        await encoder.flush();
+        muxer.finalize();
+
+        var buffer = muxer.target.buffer;
+        var finalBlob = new Blob([buffer], { type: 'video/mp4' });
+        var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
+        downloadBlob(finalBlob, filename);
+        updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
+        return;
+
+      } catch (webCodecsErr) {
+        console.warn('WebCodecs execution fallback:', webCodecsErr);
       }
-
-      updateExportProgress(96, 'Menyelesaikan file MP4...');
-      await encoder.flush();
-      muxer.finalize();
-
-      var buffer = muxer.target.buffer;
-      var finalBlob = new Blob([buffer], { type: 'video/mp4' });
-      var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
-      downloadBlob(finalBlob, filename);
-      updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
-      return;
-
-    } catch (webCodecsErr) {
-      console.warn('WebCodecs execution fallback to Synchronized MediaRecorder:', webCodecsErr);
     }
   }
 
-  // METODE 2: Synchronized Real-Time Playback Capture (Guaranteed Smooth Playback & Accurate Video Frames)
+  // METODE 2: Synchronized MediaRecorder Fallback
   return new Promise(async function(resolve, reject) {
     updateExportProgress(20, 'Merender video twibbon di browser (Foto ' + photo.id + ')...');
 
@@ -1235,7 +1254,6 @@ async function renderSynchronizedBrowserVideo(photo, compositeCanvas, currentIdx
       setTimeout(resolve, 300);
     };
 
-    // Reset video ke awal
     tempVideo.currentTime = 0;
     await seekVideoFrame(tempVideo, 0.02);
 
