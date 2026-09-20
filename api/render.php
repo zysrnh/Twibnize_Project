@@ -187,8 +187,7 @@ if ($holdDuration <= 0 || $holdDuration > 30) $holdDuration = 5.0;
 $introDuration = 10.0;
 $crossfadeDuration = 0.6;
 $fadeOffset = round($introDuration - $crossfadeDuration, 2); // 9.4s
-$photoDuration = round($holdDuration + $crossfadeDuration, 2); // 5.6s
-$totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
+$totalDuration = round($fadeOffset + $holdDuration + $crossfadeDuration, 2); // 15.0s
 
 // 6. Jalankan FFmpeg dengan Multi-Level Fallback Engine
 // Method 1: High-Definition XFade Transition + Audio Synchronization
@@ -199,10 +198,9 @@ $filterMethod1 = sprintf(
 );
 
 $cmdMethod1 = sprintf(
-    '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
+    '%s -y -i %s -loop 1 -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -c:a aac -b:a 128k -ar 44100 -t %.2f -movflags +faststart %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($introVideo),
-    $photoDuration,
     escapeshellarg($tempPhotoPath),
     $filterMethod1,
     $totalDuration,
@@ -225,10 +223,9 @@ if (!$renderSuccess) {
     );
 
     $cmdMethod2 = sprintf(
-        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -loop 1 -framerate 30 -i %s -filter_complex %s -map "[v]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
-        $photoDuration,
         escapeshellarg($tempPhotoPath),
         $filterMethod2,
         $totalDuration,
@@ -246,10 +243,9 @@ if (!$renderSuccess) {
     $filterMethod3 = '"[0:v]scale=1080:1350,setsar=1,format=yuv420p[v0];[1:v]scale=1080:1350,setsar=1,format=yuv420p[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]"';
 
     $cmdMethod3 = sprintf(
-        '%s -y -i %s -loop 1 -t %.2f -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset fast -crf 22 -r 30 -t %.2f -movflags +faststart %s 2>&1',
+        '%s -y -i %s -loop 1 -framerate 30 -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -profile:v baseline -level 3.1 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
-        $holdDuration,
         escapeshellarg($tempPhotoPath),
         $filterMethod3,
         $introDuration + $holdDuration,
