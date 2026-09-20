@@ -192,13 +192,14 @@ $photoDuration = round($holdDuration + $crossfadeDuration, 2); // 5.6s
 $totalDuration = round($fadeOffset + $photoDuration, 2); // 15.0s
 
 // ============================================================
+// ============================================================
 // 6. TWO-PASS ENCODING: 100% Anti-Crash & Anti-Buffer Overflow
 // ============================================================
 
 // Langkah 1: Render Foto menjadi Video MP4 Mini (5.6 detik)
-// Sangat cepat (~0.2 detik) dan menghasilkan stream video MP4 valid dengan framerate 30fps
+// Foto sudah berukuran pas 1080x1350 dari canvas frontend
 $cmdClip = sprintf(
-    '%s -y -loop 1 -framerate 30 -i %s -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,format=yuv420p" -t %.2f -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 %s 2>&1',
+    '%s -y -loop 1 -i %s -t %.2f -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 %s 2>&1',
     escapeshellcmd($ffmpeg),
     escapeshellarg($tempPhotoPath),
     $photoDuration,
@@ -224,7 +225,7 @@ if ($returnVarClip !== 0 || !file_exists($tempClipPath) || filesize($tempClipPat
 // Langkah 2: Gabungkan Video Intro + Klip Foto dengan Transisi Sihir (xfade)
 // Method 1: XFade Transition + Audio Sinkronisasi
 $filterMethod1 = sprintf(
-    '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad[a]"',
+    '[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v];[0:a]apad[a]',
     $crossfadeDuration,
     $fadeOffset
 );
@@ -234,7 +235,7 @@ $cmdMethod1 = sprintf(
     escapeshellcmd($ffmpeg),
     escapeshellarg($introVideo),
     escapeshellarg($tempClipPath),
-    $filterMethod1,
+    escapeshellarg($filterMethod1),
     $totalDuration,
     escapeshellarg($tempVideoPath)
 );
@@ -249,7 +250,7 @@ $renderSuccess = ($returnVar1 === 0 && file_exists($tempVideoPath) && filesize($
 $output2 = [];
 if (!$renderSuccess) {
     $filterMethod2 = sprintf(
-        '"[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]"',
+        '[0:v]settb=AVTB[v0];[1:v]settb=AVTB[v1];[v0][v1]xfade=transition=fade:duration=%.2f:offset=%.2f[v]',
         $crossfadeDuration,
         $fadeOffset
     );
@@ -259,7 +260,7 @@ if (!$renderSuccess) {
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         escapeshellarg($tempClipPath),
-        $filterMethod2,
+        escapeshellarg($filterMethod2),
         $totalDuration,
         escapeshellarg($tempVideoPath)
     );
@@ -272,14 +273,14 @@ if (!$renderSuccess) {
 // Method 3: Concat Fallback
 $output3 = [];
 if (!$renderSuccess) {
-    $filterMethod3 = '"[0:v]setsar=1[v0];[1:v]setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]"';
+    $filterMethod3 = '[0:v]setsar=1[v0];[1:v]setsar=1[v1];[v0][v1]concat=n=2:v=1:a=0[v];[0:a]apad[a]';
 
     $cmdMethod3 = sprintf(
         '%s -y -i %s -i %s -filter_complex %s -map "[v]" -map "[a]" -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -r 30 -t %.2f -movflags +faststart %s 2>&1',
         escapeshellcmd($ffmpeg),
         escapeshellarg($introVideo),
         escapeshellarg($tempClipPath),
-        $filterMethod3,
+        escapeshellarg($filterMethod3),
         $introDuration + $holdDuration,
         escapeshellarg($tempVideoPath)
     );
