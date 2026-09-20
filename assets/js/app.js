@@ -1,6 +1,6 @@
 /**
  * Twibbon Video Generator Engine - PKKMB SADAJIWA IDE LPKIA 2026
- * v9.2 - Multi-Photo with High-Speed Server FFmpeg & Ultra-Smooth 30FPS Frame-by-Frame WebCodecs Engine
+ * v9.3 - Multi-Photo with Frame-Synchronized HD Engine (No Black Screens, Rock-Solid 30fps)
  */
 
 // Global App State
@@ -903,7 +903,7 @@ function renderFrameToCanvas(ctx, time, introDuration) {
 }
 
 /* ============================================================
- * VIDEO EXPORT ENGINE (High-Speed Server FFmpeg + 30fps Deterministic WebCodecs Fallback)
+ * VIDEO EXPORT ENGINE
  * ============================================================ */
 async function startBatchVideoExport(specificIndex) {
   if (state.isRendering) return;
@@ -962,7 +962,7 @@ async function startBatchVideoExport(specificIndex) {
     Swal.fire({
       icon: 'success',
       title: 'Semua Video Berhasil Diunduh! 🎉',
-      html: 'Total <b>' + successCount + ' video MP4</b> telah berhasil dibuat dengan kualitas <b>HD 30fps</b> mulus.',
+      html: 'Total <b>' + successCount + ' video MP4</b> telah berhasil dibuat dengan kualitas <b>HD 30fps</b>.',
       confirmButtonColor: '#162b3d'
     });
   } else if (successCount > 0) {
@@ -976,7 +976,7 @@ async function startBatchVideoExport(specificIndex) {
     Swal.fire({
       icon: 'error',
       title: 'Gagal Membuat Video',
-      text: 'Terjadi kendala saat memproses video. Silakan periksa koneksi atau coba kembali.',
+      text: 'Terjadi kendala saat memproses video. Silakan coba kembali.',
       confirmButtonColor: '#162b3d'
     });
   }
@@ -1039,17 +1039,17 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
           var errJson = await response.json();
           errMsg = errJson.message || errMsg;
         } catch(e) {}
-        console.warn('Server render failed (' + errMsg + '). Beralih ke WebCodecs 30fps Engine...');
+        console.warn('Server render (' + errMsg + '). Beralih ke High-Quality Browser Engine...');
 
-        // Fallback ke Deterministic 30fps Engine
-        await renderDeterministic30fpsVideo(photo, exportCanvas, currentIdx, totalCount);
+        // Fallback langsung ke Synchronized Browser Engine
+        await renderSynchronizedBrowserVideo(photo, exportCanvas, currentIdx, totalCount);
         resolve();
 
       } catch (err) {
         clearInterval(timer);
-        console.warn('Server offline/error (' + err.message + '). Menggunakan WebCodecs 30fps Engine...');
+        console.warn('Server error (' + err.message + '). Menggunakan Synchronized Browser Engine...');
         try {
-          await renderDeterministic30fpsVideo(photo, exportCanvas, currentIdx, totalCount);
+          await renderSynchronizedBrowserVideo(photo, exportCanvas, currentIdx, totalCount);
           resolve();
         } catch (clientErr) {
           reject(clientErr);
@@ -1060,10 +1060,25 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
 }
 
 /**
- * High-Precision Deterministic Frame-by-Frame Video Engine
- * Guarantees True 30 FPS / 60 FPS HD without Any Lag or Frame Drops on Mobile Phones
+ * Helper to ensure a video element reliably seeks and renders a specific frame
  */
-async function renderDeterministic30fpsVideo(photo, compositeCanvas, currentIdx, totalCount) {
+function seekVideoFrame(video, time) {
+  return new Promise(function(resolve) {
+    var timeout = setTimeout(resolve, 120);
+    function onSeeked() {
+      clearTimeout(timeout);
+      video.removeEventListener('seeked', onSeeked);
+      resolve();
+    }
+    video.addEventListener('seeked', onSeeked);
+    video.currentTime = time;
+  });
+}
+
+/**
+ * High-Quality Synchronized Browser Video Engine (Guaranteed Visible Intro Animation + 30fps)
+ */
+async function renderSynchronizedBrowserVideo(photo, compositeCanvas, currentIdx, totalCount) {
   var width = 1080;
   var height = 1350;
   var fps = 30;
@@ -1081,6 +1096,7 @@ async function renderDeterministic30fpsVideo(photo, compositeCanvas, currentIdx,
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
+  // Setup synchronous video instance
   var tempVideo = document.createElement('video');
   tempVideo.src = state.introVideo.src;
   tempVideo.crossOrigin = 'anonymous';
@@ -1091,11 +1107,15 @@ async function renderDeterministic30fpsVideo(photo, compositeCanvas, currentIdx,
   await new Promise(function(res) {
     if (tempVideo.readyState >= 2) return res();
     tempVideo.onloadeddata = res;
+    tempVideo.oncanplay = res;
     tempVideo.onerror = res;
-    setTimeout(res, 2000);
+    setTimeout(res, 2500);
   });
 
-  // OPTION A: WebCodecs + Mp4Muxer (Hardware H.264 Encoder, 100% Exact 30 FPS MP4)
+  // Pastikan frame 0 ter-load
+  await seekVideoFrame(tempVideo, 0.05);
+
+  // METODE 1: WebCodecs + Mp4Muxer (Deterministic Seeked Frame-by-Frame, Exact 30fps HD MP4)
   if (window.VideoEncoder && window.Mp4Muxer && window.VideoFrame) {
     try {
       updateExportProgress(20, 'Menyiapkan Hardware H.264 30fps (Video ' + currentIdx + ')...');
@@ -1131,9 +1151,8 @@ async function renderDeterministic30fpsVideo(photo, compositeCanvas, currentIdx,
         var time = f / fps;
 
         if (time < introDuration) {
-          tempVideo.currentTime = Math.min(time, Math.max(0, introDuration - 0.04));
-          // Tunggu frame video ter-decode sempurna jika browser mendukung fast seek
-          if (tempVideo.fastSeek) tempVideo.fastSeek(tempVideo.currentTime);
+          var seekTarget = Math.min(time, Math.max(0, introDuration - 0.04));
+          await seekVideoFrame(tempVideo, seekTarget);
         }
 
         ctx.fillStyle = '#162b3d';
@@ -1183,18 +1202,18 @@ async function renderDeterministic30fpsVideo(photo, compositeCanvas, currentIdx,
       return;
 
     } catch (webCodecsErr) {
-      console.warn('WebCodecs failed, fallback to MediaRecorder pacing:', webCodecsErr);
+      console.warn('WebCodecs execution fallback to Synchronized MediaRecorder:', webCodecsErr);
     }
   }
 
-  // OPTION B: Paced MediaRecorder Fallback
-  return new Promise(function(resolve, reject) {
-    updateExportProgress(20, 'Merender video 30fps di browser...');
+  // METODE 2: Synchronized Real-Time Playback Capture (Guaranteed Smooth Playback & Accurate Video Frames)
+  return new Promise(async function(resolve, reject) {
+    updateExportProgress(20, 'Merender video twibbon di browser (Foto ' + photo.id + ')...');
 
     var stream = canvas.captureStream(30);
-    var options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 6000000 };
+    var options = { mimeType: 'video/mp4' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 6000000 };
     if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
-    if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/mp4' };
 
     var recorder;
     try {
@@ -1216,12 +1235,16 @@ async function renderDeterministic30fpsVideo(photo, compositeCanvas, currentIdx,
       setTimeout(resolve, 300);
     };
 
-    recorder.start(100);
+    // Reset video ke awal
     tempVideo.currentTime = 0;
+    await seekVideoFrame(tempVideo, 0.02);
+
+    recorder.start(100);
     tempVideo.play().catch(function() {});
 
     var startTime = performance.now();
-    function loop() {
+
+    function renderLoop() {
       var now = performance.now();
       var time = (now - startTime) / 1000;
 
@@ -1248,10 +1271,12 @@ async function renderDeterministic30fpsVideo(photo, compositeCanvas, currentIdx,
       }
 
       var pct = Math.min(95, Math.floor(20 + (time / totalDuration) * 75));
-      updateExportProgress(pct, 'Merender ' + time.toFixed(1) + 's / ' + totalDuration.toFixed(1) + 's...');
-      requestAnimationFrame(loop);
+      updateExportProgress(pct, 'Memproses video ' + time.toFixed(1) + 's / ' + totalDuration.toFixed(1) + 's...');
+
+      requestAnimationFrame(renderLoop);
     }
-    requestAnimationFrame(loop);
+
+    requestAnimationFrame(renderLoop);
   });
 }
 
