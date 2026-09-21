@@ -2,7 +2,54 @@
 /**
  * Diagnostic Tool - Server Capability Check for Twibbon Video Generator
  * URL: /api/check.php
+ * 
+ * Kalau dipanggil dengan Accept: application/json atau ?format=json,
+ * return JSON { ffmpeg: true/false, ... }
+ * Kalau dipanggil biasa, return HTML diagnostic page.
  */
+
+// Cek apakah request minta JSON response
+$wantsJson = false;
+if (isset($_GET['format']) && $_GET['format'] === 'json') {
+    $wantsJson = true;
+} elseif (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) {
+    $wantsJson = true;
+}
+
+if ($wantsJson) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Access-Control-Allow-Origin: *');
+    
+    $disabled_funcs = array_map('trim', explode(',', (string)ini_get('disable_functions')));
+    $exec_ok = function_exists('exec') && !in_array('exec', $disabled_funcs);
+    $shell_ok = function_exists('shell_exec') && !in_array('shell_exec', $disabled_funcs);
+    
+    $ffmpegFound = false;
+    if ($exec_ok || $shell_ok) {
+        $candidates = ['ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg'];
+        // Tambah path khusus Windows
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $candidates[] = 'ffmpeg.exe';
+            $candidates[] = 'C:\\ffmpeg\\bin\\ffmpeg.exe';
+        }
+        foreach ($candidates as $bin) {
+            $checkCmd = escapeshellcmd($bin) . ' -version 2>&1';
+            $output = @shell_exec($checkCmd);
+            if ($output && stripos($output, 'ffmpeg version') !== false) {
+                $ffmpegFound = true;
+                break;
+            }
+        }
+    }
+    
+    echo json_encode([
+        'ffmpeg' => $ffmpegFound,
+        'exec' => $exec_ok,
+        'shell_exec' => $shell_ok,
+        'php' => PHP_VERSION
+    ]);
+    exit;
+}
 
 header('Content-Type: text/html; charset=utf-8');
 

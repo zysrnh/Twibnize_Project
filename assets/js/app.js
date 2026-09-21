@@ -1002,47 +1002,75 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
         return reject(new Error('Gagal membuat blob gambar'));
       }
 
-      updateExportProgress(15, 'Menghubungkan ke server render (Foto ' + photo.id + ')...');
-
-      var formData = new FormData();
-      formData.append('image', blob, 'twibbon_composite_' + photo.id + '.jpg');
-      formData.append('holdDuration', state.holdPhotoDuration || 5);
-
-      var curPercent = 15;
-      var timer = setInterval(function() {
-        if (curPercent < 85) {
-          curPercent += Math.floor(Math.random() * 4) + 2;
-          if (curPercent > 85) curPercent = 85;
-          updateExportProgress(curPercent, 'Memproses Video ' + currentIdx + ' dari ' + totalCount + ' (30fps HD)...');
-        }
-      }, 350);
-
+      // Pertama coba cek apakah server tersedia & punya FFmpeg
+      var serverAvailable = false;
       try {
-        var response = await fetch('api/render.php', {
-          method: 'POST',
-          body: formData
-        });
-
-        clearInterval(timer);
-
-        if (response.ok && response.headers.get('Content-Type') && response.headers.get('Content-Type').includes('video')) {
-          updateExportProgress(95, 'Mengunduh file MP4 Video ' + photo.id + '...');
-          var videoBlob = await response.blob();
-          var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
-          downloadBlob(videoBlob, filename);
-          updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
-          return setTimeout(resolve, 300);
+        var checkResp = await fetch('api/check.php?format=json', { method: 'GET' });
+        if (checkResp.ok) {
+          var checkData = await checkResp.json();
+          serverAvailable = checkData && checkData.ffmpeg === true;
         }
+      } catch(e) {
+        serverAvailable = false;
+      }
 
-        console.warn('Beralih ke Ultra-Smooth Hardware Video Engine...');
-        await renderHardwareAcceleratedVideo(photo, exportCanvas, currentIdx, totalCount);
-        resolve();
+      if (serverAvailable) {
+        updateExportProgress(15, 'Mengirim ke server render (Foto ' + photo.id + ')...');
 
-      } catch (err) {
-        clearInterval(timer);
-        console.warn('Server offline, beralih ke Ultra-Smooth Hardware Video Engine...');
+        var formData = new FormData();
+        formData.append('image', blob, 'twibbon_composite_' + photo.id + '.jpg');
+        formData.append('holdDuration', state.holdPhotoDuration || 5);
+
+        var curPercent = 15;
+        var timer = setInterval(function() {
+          if (curPercent < 85) {
+            curPercent += Math.floor(Math.random() * 4) + 2;
+            if (curPercent > 85) curPercent = 85;
+            updateExportProgress(curPercent, 'Server merender Video ' + currentIdx + ' dari ' + totalCount + ' (30fps HD)...');
+          }
+        }, 350);
+
         try {
-          await renderHardwareAcceleratedVideo(photo, exportCanvas, currentIdx, totalCount);
+          var response = await fetch('api/render.php', {
+            method: 'POST',
+            body: formData
+          });
+
+          clearInterval(timer);
+
+          var contentType = response.headers.get('Content-Type') || '';
+          if (response.ok && contentType.includes('video')) {
+            updateExportProgress(95, 'Mengunduh file MP4 Video ' + photo.id + '...');
+            var videoBlob = await response.blob();
+            // Pastikan ukuran file cukup besar (minimal 10KB) untuk jadi video beneran
+            if (videoBlob.size > 10000) {
+              var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
+              downloadBlob(videoBlob, filename);
+              updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
+              return setTimeout(resolve, 300);
+            }
+          }
+
+          // Server response bukan video / file terlalu kecil, fallback ke client
+          console.warn('Server response bukan video valid, fallback ke client engine...');
+          await renderFrameByFrameVideo(photo, exportCanvas, currentIdx, totalCount);
+          resolve();
+
+        } catch (err) {
+          clearInterval(timer);
+          console.warn('Server error, fallback ke client engine:', err);
+          try {
+            await renderFrameByFrameVideo(photo, exportCanvas, currentIdx, totalCount);
+            resolve();
+          } catch (clientErr) {
+            reject(clientErr);
+          }
+        }
+      } else {
+        // Server tidak tersedia atau FFmpeg tidak ada, langsung client-side
+        console.log('FFmpeg tidak tersedia di server, pakai client-side engine.');
+        try {
+          await renderFrameByFrameVideo(photo, exportCanvas, currentIdx, totalCount);
           resolve();
         } catch (clientErr) {
           reject(clientErr);
@@ -1053,21 +1081,32 @@ function renderSinglePhotoVideo(photo, currentIdx, totalCount) {
 }
 
 /**
- * Ultra-Smooth Hardware-Accelerated Video Engine (Zero Lag, Zero Frame Drops on Android & iOS)
+ * Frame-by-Frame Video Engine — Smooth & Lag-Free
+ * Alih-alih real-time playback + MediaRecorder (yang sering lag/patah),
+ * engine ini:
+ * 1. Seek video ke waktu tertentu (frame demi frame)
+ * 2. Tunggu frame siap (seeked event)
+ * 3. Gambar frame ke canvas
+ * 4. Rekam via MediaRecorder
+ * 5. Ulangi sampai selesai
+ * Hasilnya smooth 100% karena gak tergantung performa real-time device.
  */
-function renderHardwareAcceleratedVideo(photo, compositeCanvas, currentIdx, totalCount) {
+function renderFrameByFrameVideo(photo, compositeCanvas, currentIdx, totalCount) {
   return new Promise(async function(resolve, reject) {
-    updateExportProgress(20, 'Memulai video hardware 30fps (Foto ' + photo.id + ')...');
+    updateExportProgress(10, 'Menyiapkan client-side video engine (Foto ' + photo.id + ')...');
 
     var width = 1080;
     var height = 1350;
     var fps = 30;
+    var frameInterval = 1.0 / fps;
     var introDuration = state.introVideo.duration && !isNaN(state.introVideo.duration) ? state.introVideo.duration : 10.0;
     var holdDuration = state.holdPhotoDuration || 5.0;
     var totalDuration = introDuration + holdDuration;
     var crossfadeDuration = 0.6;
     var fadeStartTime = Math.max(0, introDuration - crossfadeDuration);
+    var totalFrames = Math.ceil(totalDuration * fps);
 
+    // Buat canvas untuk rendering
     var canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -1075,6 +1114,7 @@ function renderHardwareAcceleratedVideo(photo, compositeCanvas, currentIdx, tota
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
+    // Siapkan video intro untuk seeking
     var tempVideo = document.createElement('video');
     tempVideo.src = state.introVideo.src;
     tempVideo.crossOrigin = 'anonymous';
@@ -1084,22 +1124,36 @@ function renderHardwareAcceleratedVideo(photo, compositeCanvas, currentIdx, tota
 
     await new Promise(function(res) {
       if (tempVideo.readyState >= 3) return res();
-      tempVideo.oncanplay = res;
-      tempVideo.onloadeddata = res;
+      tempVideo.oncanplaythrough = res;
+      tempVideo.onloadeddata = function() {
+        if (tempVideo.readyState >= 2) res();
+      };
       tempVideo.onerror = res;
-      setTimeout(res, 2000);
+      setTimeout(res, 4000);
     });
 
-    var stream = canvas.captureStream(fps);
-    var mimeType = 'video/mp4';
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp9';
+    // Detect mime type yang didukung browser
+    var mimeType = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp8';
     if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
+
+    var fileExt = mimeType.includes('webm') ? '.webm' : '.mp4';
 
     var recorder;
     try {
-      recorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 6000000 });
+      recorder = new MediaRecorder(canvas.captureStream(0), {
+        mimeType: mimeType,
+        videoBitsPerSecond: 8000000
+      });
     } catch(e) {
-      return reject(new Error('Browser tidak mendukung MediaRecorder'));
+      // Fallback: coba tanpa opsi
+      try {
+        recorder = new MediaRecorder(canvas.captureStream(0));
+        fileExt = '.webm';
+      } catch(e2) {
+        return reject(new Error('Browser tidak mendukung MediaRecorder'));
+      }
     }
 
     var recordedChunks = [];
@@ -1107,66 +1161,122 @@ function renderHardwareAcceleratedVideo(photo, compositeCanvas, currentIdx, tota
       if (e.data && e.data.size > 0) recordedChunks.push(e.data);
     };
 
-    recorder.onstop = function() {
-      var blob = new Blob(recordedChunks, { type: mimeType });
-      var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + '.mp4';
-      downloadBlob(blob, filename);
-      updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
-      setTimeout(resolve, 300);
-    };
+    var recorderStopped = new Promise(function(res) {
+      recorder.onstop = function() { res(); };
+    });
 
-    tempVideo.currentTime = 0;
-    recorder.start(100);
+    recorder.start();
 
-    try {
-      await tempVideo.play();
-    } catch(e) {}
+    updateExportProgress(15, 'Mulai rendering frame-by-frame (Foto ' + photo.id + ')...');
 
-    var recordingStartTime = performance.now();
-    var isRecordingFinished = false;
+    // Helper: seek video dan tunggu sampai frame siap
+    function seekVideoToTime(video, time) {
+      return new Promise(function(res) {
+        if (time >= (video.duration || introDuration)) {
+          return res(); // Di luar durasi video, skip
+        }
+        var onSeeked = function() {
+          video.removeEventListener('seeked', onSeeked);
+          // Kasih sedikit delay biar frame benar-benar siap
+          setTimeout(res, 5);
+        };
+        video.addEventListener('seeked', onSeeked);
+        video.currentTime = Math.min(time, (video.duration || introDuration) - 0.01);
+        // Safety timeout kalau seeked gak fire
+        setTimeout(res, 200);
+      });
+    }
 
-    function drawCurrentFrame() {
-      if (isRecordingFinished) return;
+    // Helper: request satu frame dari MediaRecorder (manual frame capture)
+    var captureStream = canvas.captureStream(0);
+    var videoTrack = captureStream.getVideoTracks()[0];
 
-      var elapsed = (performance.now() - recordingStartTime) / 1000;
+    function captureFrame() {
+      // Trigger frame capture di captureStream(0) mode
+      if (videoTrack && videoTrack.requestFrame) {
+        videoTrack.requestFrame();
+      }
+    }
 
-      if (elapsed >= totalDuration) {
-        isRecordingFinished = true;
-        tempVideo.pause();
+    // Render frame by frame
+    var currentFrame = 0;
+
+    async function processNextFrame() {
+      if (currentFrame >= totalFrames) {
+        // Selesai — capture frame terakhir dan stop
+        captureFrame();
+        // Kasih waktu recorder menyerap chunk terakhir
+        await new Promise(function(r) { setTimeout(r, 100); });
         recorder.stop();
         return;
       }
 
+      var time = currentFrame * frameInterval;
+
+      // Gambar frame sesuai timeline
       ctx.fillStyle = '#162b3d';
       ctx.fillRect(0, 0, width, height);
 
-      if (elapsed < fadeStartTime) {
+      if (time < fadeStartTime) {
+        // Fase 1: video intro murni
+        if (time < introDuration) {
+          await seekVideoToTime(tempVideo, time);
+          drawCoverMedia(ctx, tempVideo, width, height);
+        }
+      } else if (time >= fadeStartTime && time < introDuration) {
+        // Fase 2: crossfade dari video ke foto+frame
+        await seekVideoToTime(tempVideo, time);
         drawCoverMedia(ctx, tempVideo, width, height);
-      } else if (elapsed >= fadeStartTime && elapsed < introDuration) {
-        drawCoverMedia(ctx, tempVideo, width, height);
-        var progress = (elapsed - fadeStartTime) / crossfadeDuration;
+        var progress = (time - fadeStartTime) / crossfadeDuration;
         ctx.save();
         ctx.globalAlpha = Math.min(1, Math.max(0, progress));
         ctx.drawImage(compositeCanvas, 0, 0, width, height);
         ctx.restore();
       } else {
+        // Fase 3: foto+frame statis
         ctx.drawImage(compositeCanvas, 0, 0, width, height);
       }
 
-      var progressPercent = Math.min(96, Math.floor(20 + (elapsed / totalDuration) * 75));
-      updateExportProgress(progressPercent, 'Memproses video ' + elapsed.toFixed(1) + 's / ' + totalDuration.toFixed(1) + 's (30fps HD)...');
+      // Capture frame ke recorder
+      captureFrame();
 
-      if (elapsed < introDuration && tempVideo.requestVideoFrameCallback) {
-        tempVideo.requestVideoFrameCallback(drawCurrentFrame);
-      } else {
-        requestAnimationFrame(drawCurrentFrame);
+      // Update progress UI
+      var progressPercent = Math.min(96, Math.floor(15 + (currentFrame / totalFrames) * 80));
+      if (currentFrame % 15 === 0 || currentFrame === totalFrames - 1) {
+        updateExportProgress(progressPercent, 'Rendering frame ' + (currentFrame + 1) + '/' + totalFrames + ' (' + time.toFixed(1) + 's/' + totalDuration.toFixed(1) + 's)...');
       }
+
+      currentFrame++;
+
+      // Gunakan setTimeout supaya UI thread gak freeze dan recorder bisa buffer
+      await new Promise(function(r) { setTimeout(r, 8); });
+
+      // Recursive call
+      return processNextFrame();
     }
 
-    if (tempVideo.requestVideoFrameCallback) {
-      tempVideo.requestVideoFrameCallback(drawCurrentFrame);
-    } else {
-      requestAnimationFrame(drawCurrentFrame);
+    try {
+      await processNextFrame();
+      await recorderStopped;
+
+      // Buat blob dan download
+      var finalBlob = new Blob(recordedChunks, { type: mimeType });
+
+      if (finalBlob.size < 5000) {
+        return reject(new Error('Video output terlalu kecil (' + finalBlob.size + ' bytes), kemungkinan gagal render.'));
+      }
+
+      var filename = 'Twibbon_PKKMB_LPKIA_Foto_' + photo.id + '_' + Date.now() + fileExt;
+      downloadBlob(finalBlob, filename);
+      updateExportProgress(100, 'Selesai Video ' + photo.id + '!');
+      setTimeout(resolve, 300);
+
+    } catch(err) {
+      reject(err);
+    } finally {
+      // Cleanup
+      tempVideo.src = '';
+      tempVideo.load();
     }
   });
 }
